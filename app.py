@@ -9,9 +9,9 @@ app = Flask(__name__)
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
-#
-#openai.api_key = 'sk-mWJ6YEKmLRYNNq9ElhbopGQawAIRrJnOd95F743DoLT3BlbkFJM1u-URS6JHQ_vsvnTMxfEgdRM97BVrzhsNwDObxtgA'
-#app.secret_key = 'supersecretkey'
+
+openai.api_key = 'sk-mWJ6YEKmLRYNNq9ElhbopGQawAIRrJnOd95F743DoLT3BlbkFJM1u-URS6JHQ_vsvnTMxfEgdRM97BVrzhsNwDObxtgA'
+app.secret_key = 'supersecretkey'
 
 
 # Home route
@@ -23,33 +23,41 @@ def home():
 # Chat route - handles the conversation with the LLM
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json['message']
-    animal_type = request.json['animalType']
+    user_message = request.json['message', '']
+    subject = requestion.json['subject', 'General Knowledge']
+    # animal_type = request.json['animalType']
 
     if 'conversation' not in session:
         session['conversation'] = []
-
-    # Append the user's message to the conversation
-    session['conversation'].append({"role": "user", "content": user_message})
+    if user_message:
+        # Append the user's message to the conversation
+        session['conversation'].append({"role": "user", "content": user_message})
 
     # Read the initial prompt from the file
     text_file_path = 'topic_prompts/initial_prompt.txt'
-    if not os.path.exists(text_file_path):
-        return jsonify({'response': 'Initial prompt file not found.'})
+    if os.path.exists(text_file_path):
+        with open(text_file_path, 'a') as file: 
+            file.write(f"\n\nStudent has chosen the subject: {subject}\n")
 
     with open(text_file_path, 'r') as file:
         initial_prompt = file.read()
 
     # Construct the system message
-    system_message = f"The user is showing a picture of a {animal_type}. Respond accordingly"
+    # system_message = f"The user is showing a picture of a {animal_type}. Respond accordingly"
 
     # The messages structure for the API call
+
+    # messages = [{
+    #     "role": "system",
+    #     "content": initial_prompt
+    # }, {
+    #     "role": "system",
+    #     "content": system_message
+    # }] + session['conversation']
+
     messages = [{
         "role": "system",
         "content": initial_prompt
-    }, {
-        "role": "system",
-        "content": system_message
     }] + session['conversation']
 
     try:
