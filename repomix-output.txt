@@ -1,0 +1,902 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+static/
+  chat.css
+  chat.js
+  script.js
+  styles.css
+templates/
+  chatbot.html
+  index.html
+topic_prompts/
+  initial_prompt.txt
+app.py
+c2cbot.code-workspace
+diagnostic_test.txt
+pyproject.toml
+README.md
+
+================================================================
+Files
+================================================================
+
+================
+File: static/chat.css
+================
+.chat-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+  }
+  
+  .chat-log {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+  }
+  
+  .chat-message {
+    margin-bottom: 10px;
+  }
+  
+  #chat-form {
+    display: flex;
+  }
+  
+  #chat-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+  }
+  
+  #chat-form button {
+    padding: 10px 20px;
+    border: none;
+    background: #35424a;
+    color: #fff;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+  }
+  
+  #chat-form button:hover {
+    background: #2c3e50;
+  }
+
+================
+File: static/chat.js
+================
+document.addEventListener('DOMContentLoaded', () => {
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+  const chatBox = document.getElementById('chat-box');
+
+  chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      appendMessage('You', message);
+      chatInput.value = '';
+
+      try {
+          const response = await fetch('/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: message, subject: "General" })
+          });
+
+          const data = await response.json();
+          appendMessage('AI', data.response || "Error: No response from AI.");
+      } catch (error) {
+          appendMessage('AI', 'Error: Could not reach server.');
+      }
+  });
+
+  function appendMessage(sender, text) {
+      const messageElement = document.createElement('div');
+      messageElement.textContent = `${sender}: ${text}`;
+      chatBox.appendChild(messageElement);
+      chatBox.scrollTop = chatBox.scrollHeight;
+  }
+});
+
+================
+File: static/script.js
+================
+// Wait for the document to load
+document.addEventListener('DOMContentLoaded', () => {
+    const signInForm = document.getElementById('sign-in-form');
+    const signUpForm = document.getElementById('sign-up-form');
+  
+    if (signInForm) {
+      signInForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        // Implement sign-in functionality here
+        alert('Sign In functionality is not implemented.');
+      });
+    }
+  
+    if (signUpForm) {
+      signUpForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        // Implement sign-up functionality here
+        alert('Sign Up functionality is not implemented.');
+      });
+    }
+  });
+  
+  // Function to toggle modals
+  function toggleModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    if (modal.style.display === "flex") {
+      modal.style.display = "none";
+    } else {
+      modal.style.display = "flex";
+    }
+  }
+  
+  // Close modal if clicking outside the modal content
+  window.onclick = function (event) {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach((modal) => {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    });
+  };
+
+================
+File: static/styles.css
+================
+/* Global Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    background-color: #f4f4f4;
+    color: #333;
+  }
+  
+  .container {
+    width: 90%;
+    max-width: 1200px;
+    margin: auto;
+  }
+  
+  /* Header Styles */
+  header {
+    background: #35424a;
+    color: #ffffff;
+    padding: 20px 0;
+  }
+  
+  header .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  header h1 {
+    margin: 0;
+  }
+  
+  nav ul {
+    list-style: none;
+    display: flex;
+  }
+  
+  nav ul li {
+    margin: 0 15px;
+  }
+  
+  nav ul li a {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+  }
+  
+  nav ul li a:hover {
+    color: #e8491d;
+  }
+  
+  /* Hero Section */
+  .hero {
+    background: url('../static/hero-bg.jpg') no-repeat center center/cover;
+    height: 400px;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #ffffff;
+    position: relative;
+  }
+  
+  .hero::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(53, 66, 74, 0.7);
+    z-index: 1;
+  }
+  
+  .hero .container {
+    position: relative;
+    z-index: 2;
+  }
+  
+  .hero h2 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+  }
+  
+  .hero p {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+  }
+  
+  .hero-buttons button {
+    background: #e8491d;
+    border: none;
+    color: #fff;
+    padding: 10px 20px;
+    margin: 0 10px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.3s;
+  }
+  
+  .hero-buttons button:hover {
+    background: #cf3e14;
+  }
+  
+  /* Features Section */
+  .features {
+    padding: 40px 0;
+    background: #fff;
+    text-align: center;
+  }
+  
+  .features h2 {
+    margin-bottom: 20px;
+  }
+  
+  .feature {
+    background: #f4f4f4;
+    padding: 20px;
+    margin: 20px;
+    display: inline-block;
+    width: 250px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* About & Contact Sections */
+  .about, .contact {
+    padding: 40px 0;
+    background: #fff;
+    text-align: center;
+  }
+  
+  .about h2, .contact h2 {
+    margin-bottom: 20px;
+  }
+  
+  /* Footer */
+  footer {
+    background: #35424a;
+    color: #fff;
+    text-align: center;
+    padding: 10px 0;
+    margin-top: 20px;
+  }
+  
+  /* Modal Styles */
+  .modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    background: #fff;
+    margin: auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 400px;
+    position: relative;
+    animation: fadeIn 0.3s;
+  }
+  
+  .close {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+  }
+  
+  /* Form Styles */
+  form input[type="text"],
+  form input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  form button {
+    width: 100%;
+    background: #35424a;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s;
+  }
+  
+  form button:hover {
+    background: #2c3e50;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 768px) {
+    header .container {
+      flex-direction: column;
+    }
+  
+    nav ul {
+      flex-direction: column;
+      margin-top: 10px;
+    }
+  
+    nav ul li {
+      margin: 10px 0;
+    }
+  
+    .feature {
+      width: 80%;
+      margin: 20px auto;
+    }
+  }
+
+================
+File: templates/chatbot.html
+================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Optional: include chat.css for extra styling -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>AI Chatbot</h1>
+      <nav>
+        <ul>
+          <!-- Link to return to the homepage -->
+          <li><a href="/">Home</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="chat-container container">
+    <div id="chat-box" class="chat-log">
+      <!-- Chat messages will appear here -->
+    </div>
+    <form id="chat-form">
+      <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" required>
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+  
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>
+
+================
+File: templates/index.html
+================
+<!--
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scholar AI</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Scholar AI</h1>
+    </header>
+
+    <section class="hero">
+      <h2>AI-Powered Learning for Everyone</h2>
+      <p>Enhance your teaching and learning experience with Scholar AI.</p>
+      <button onclick="showSignIn()">Sign In</button>
+      <button onclick="showSignUp()">Sign Up</button>
+    </section>
+
+ 
+    <div id="sign-in-modal" class="modal">
+      <h2>Sign In</h2>
+      <input type="text" id="login-username" placeholder="Username" required />
+      <input
+        type="password"
+        id="login-password"
+        placeholder="Password"
+        required
+      />
+      <button onclick="signIn()">Sign In</button>
+      <button onclick="toggleSignIn()">Close</button>
+    </div>
+
+
+    <div id="sign-up-modal" class="modal">
+      <h2>Sign Up</h2>
+      <input type="text" id="signup-username" placeholder="Username" required />
+      <input
+        type="password"
+        id="signup-password"
+        placeholder="Password"
+        required
+      />
+      <button onclick="signUp()">Sign Up</button>
+      <button onclick="toggleSignUp()">Close</button>
+    </div>
+
+    <section class="features">
+      <h2>Key Features</h2>
+      <div class="feature">
+        <h3>Interactive AI Tutor</h3>
+        <p>Get real-time assistance with AI-powered tutoring.</p>
+      </div>
+      <div class="feature">
+        <h3>Lesson Planning</h3>
+        <p>AI-generated lesson plans tailored to your needs.</p>
+      </div>
+      <div class="feature">
+        <h3>Student Analytics</h3>
+        <p>Track and improve student performance with AI insights.</p>
+      </div>
+    </section>
+  </body>
+</html>
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Scholar AI</h1>
+      <nav>
+        <ul>
+          <li><a href="#hero">Home</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#contact">Contact</a></li>
+          <!-- New link to switch to the Chatbot page -->
+          <li><a href="/chatbot">Chatbot</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section id="hero" class="hero">
+    <div class="container">
+      <h2>AI-Powered Learning for Everyone</h2>
+      <p>Enhance your teaching and learning experience with Scholar AI.</p>
+      <div class="hero-buttons">
+        <button onclick="toggleModal('sign-in-modal')">Sign In</button>
+        <button onclick="toggleModal('sign-up-modal')">Sign Up</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sign In Modal -->
+  <div id="sign-in-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="toggleModal('sign-in-modal')">&times;</span>
+      <h2>Sign In</h2>
+      <form id="sign-in-form">
+        <input type="text" id="login-username" placeholder="Username" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sign Up Modal -->
+  <div id="sign-up-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="toggleModal('sign-up-modal')">&times;</span>
+      <h2>Sign Up</h2>
+      <form id="sign-up-form">
+        <input type="text" id="signup-username" placeholder="Username" required />
+        <input type="password" id="signup-password" placeholder="Password" required />
+        <button type="submit">Sign Up</button>
+      </form>
+    </div>
+  </div>
+
+  <section id="features" class="features">
+    <div class="container">
+      <h2>Key Features</h2>
+      <div class="feature">
+        <h3>Interactive AI Tutor</h3>
+        <p>Get real-time assistance with AI-powered tutoring.</p>
+      </div>
+      <div class="feature">
+        <h3>Lesson Planning</h3>
+        <p>AI-generated lesson plans tailored to your needs.</p>
+      </div>
+      <div class="feature">
+        <h3>Student Analytics</h3>
+        <p>Track and improve student performance with AI insights.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="about">
+    <div class="container">
+      <h2>About Scholar AI</h2>
+      <p>Scholar AI leverages cutting-edge artificial intelligence to enhance educational experiences for both teachers and students.</p>
+    </div>
+  </section>
+
+  <section id="contact" class="contact">
+    <div class="container">
+      <h2>Contact Us</h2>
+      <p>
+        Have questions or need assistance? Reach out to us at
+        <a href="mailto:support@scholarai.com">support@scholarai.com</a>.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
+
+================
+File: topic_prompts/initial_prompt.txt
+================
+Everytime someone runs this program erase all previous data about this person and start off by saying "Hi I am scholar AI how many I help you today?"
+
+You are a scholar AI robot that only helps people learn.
+
+First ask the student what subject they would like to study. If they try to get off topic keep asking them till a response
+
+Then ask them about the grade level and the specific topic. Once they give that start teaching them.
+
+
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+
+================
+File: app.py
+================
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
+import openai
+import os
+
+app = Flask(__name__)
+
+# Session configuration
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+openai.api_key = os.environ.get("OPENAI_API_KEY")
+app.secret_key = 'supersecretkey'
+
+
+# Home route
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/chatbot')
+def chatbot_page():
+    return render_template('chatbot.html')
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_message = request.json.get('message', '')
+    subject = request.json.get('subject', 'General Knowledge')
+    
+    if 'conversation' not in session:
+        session['conversation'] = []
+    
+    if user_message:
+        session['conversation'].append({"role": "user", "content": user_message})
+
+    text_file_path = 'topic_prompts/initial_prompt.txt'
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
+
+    # Ensure the file exists before appending
+    if not os.path.exists(text_file_path):
+        with open(text_file_path, 'w') as file:
+            file.write("Initial prompt for chatbot interaction.\n")
+
+    with open(text_file_path, 'a') as file: 
+        file.write(f"\n\nStudent has chosen the subject: {subject}\n")
+
+    with open(text_file_path, 'r') as file:
+        initial_prompt = file.read()
+
+    messages = [{"role": "system", "content": initial_prompt}] + session['conversation']
+
+    try:
+        # Make API call to OpenAI using the messages
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo-1106",
+            messages=messages
+        )
+        # Extract the content from the response
+        gpt_response = response.choices[0].message.content
+
+        # Append the GPT response to the conversation history
+        session['conversation'].append({
+            "role": "assistant",
+            "content": gpt_response
+        })
+
+        # Return a valid JSON response
+        return jsonify({'response': gpt_response})
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+        return jsonify({'error': str(e)}), 500
+
+   
+
+'''
+# Chat route - handles the conversation with the LLM
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_message = request.json['message', '']
+    subject = requestion.json['subject', 'General Knowledge']
+    # animal_type = request.json['animalType']
+
+    if 'conversation' not in session:
+        session['conversation'] = []
+    if user_message:
+        # Append the user's message to the conversation
+        session['conversation'].append({"role": "user", "content": user_message})
+
+    # Read the initial prompt from the file
+    text_file_path = 'topic_prompts/initial_prompt.txt'
+    if os.path.exists(text_file_path):
+        with open(text_file_path, 'a') as file: 
+            file.write(f"\n\nStudent has chosen the subject: {subject}\n")
+
+    with open(text_file_path, 'r') as file:
+        initial_prompt = file.read()
+
+    # Construct the system message
+    # system_message = f"The user is showing a picture of a {animal_type}. Respond accordingly"
+
+    # The messages structure for the API call
+
+    # messages = [{
+    #     "role": "system",
+    #     "content": initial_prompt
+    # }, {
+    #     "role": "system",
+    #     "content": system_message
+    # }] + session['conversation']
+
+    messages = [{
+        "role": "system",
+        "content": initial_prompt
+    }] + session['conversation']
+
+    try:
+        # Make API call to OpenAI using the messages
+        response = openai.chat.completions.create(model="gpt-3.5-turbo-1106",
+                                                  messages=messages)
+        # Extract the content from the response
+        gpt_response = response.choices[0].message.content
+
+        # Append the GPT response to the conversation history
+        session['conversation'].append({
+            "role": "assistant",
+            "content": gpt_response
+        })
+
+        # Return the GPT response
+        return jsonify({'response': gpt_response})
+    except Exception as e:
+        # Log the error and return a message
+        app.logger.error(f"An error occurred: {e}")
+        return jsonify({'error': str(e)}), 500
+
+'''
+# Clear session route
+@app.route('/clear_session', methods=['GET'])
+def clear_session():
+    # Clear the session
+    session.clear()
+    return jsonify({'status': 'session cleared'})
+
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=8080)
+
+================
+File: c2cbot.code-workspace
+================
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
+
+================
+File: diagnostic_test.txt
+================
+Directive for ChatBot:
+You are tasked with creating a 10 question diagnostic test for a student to see how well they know the specific subject they choose. These questions will be number 1-10 with variance in each question providing either a free response question or a multiple choice question that has 4 answer choices. Each question should be separated by a line break and a dashed line. Your purpose is to create different questions to see what the student knows and what the student doesn’t.
+
+================
+File: pyproject.toml
+================
+[tool.poetry]
+name = "python-template"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10.0,<3.11"
+flask = "^3.0.0"
+gunicorn = "^21.2.0"
+flask-session = "^0.8.0"
+openai = "^1.16.1"
+
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+useLibraryCodeForTypes = true
+exclude = [".cache"]
+
+[tool.ruff]
+# https://beta.ruff.rs/docs/configuration/
+select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
+ignore = ['W291', 'W292', 'W293']
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+================
+File: README.md
+================
+# ScholarAI
+
+
+
+================================================================
+End of Codebase
+================================================================
