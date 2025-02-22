@@ -3,33 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chatbot</title>
+  <title>Chatbot | Scholar AI</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <!-- Optional: include chat.css for extra styling -->
   <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>AI Chatbot</h1>
+      <h1>Scholar AI Chatbot</h1>
       <nav>
         <ul>
-          <!-- Link to return to the homepage -->
           <li><a href="/">Home</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
+  <section class="chat-instructions container">
+    <h2>How to Use</h2>
+    <p>Welcome to the Scholar AI Chatbot! Type your queries in the input box and press 'Send' to start a conversation with our AI-powered assistant.</p>
+    <ul>
+      <li>Ask educational questions and get AI-generated responses.</li>
+      <li>Use clear and concise language for better responses.</li>
+      <li>Enjoy interactive and engaging learning!</li>
+    </ul>
+  </section>
+
   <main class="chat-container container">
     <div id="chat-box" class="chat-log">
       <!-- Chat messages will appear here -->
     </div>
-    <form id="chat-form">
-      <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" required>
-      <button type="submit">Send</button>
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" placeholder="Type your message here..." autocomplete="off" required></textarea>
+      <button type="submit" class="send-button">Send</button>
     </form>
   </main>
+
+  <section class="chat-history container">
+    <h2>Chat History</h2>
+    <p>Your recent conversations will appear here for easy reference.</p>
+    <div id="chat-history">
+      <!-- Past conversations will be loaded here dynamically -->
+    </div>
+  </section>
 
   <footer>
     <div class="container">
