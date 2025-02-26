@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Scholar AI Chatbot</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/diagnostic">Diagnostic Test</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="chat-container container">
+    <!-- <div id="chat-box" class="chat-log"></div>  -->
+
+    <div id="test-generation" class="test-generation-form">
+      <h2>Generate a Diagnostic Test</h2>
+      <form id="generate-test-form">
+        <label for="subject">Subject:</label> 
+        <input type="text" id="subject" placeholder="Enter subject (e.g., Mathematics)" required>
+
+        <label for="grade-level">Grade Level:</label>
+        <input type="text" id="grade-level" placeholder="Enter grade level (e.g., 7)" required>
+
+        <label for="topic">Topic:</label>
+        <input type="text" id="topic" placeholder="Enter topic (e.g., Algebra)" required>
+
+        <button type="submit">Generate Test</button>
+      </form>
+
+      <!-- Display generated test here -->
+      <div id="test-output" class="test-box" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Toggle Test Generation Form visibility
+      function toggleTestGeneration() {
+        const testForm = document.getElementById('test-generation');
+        const showButton = document.getElementById('show-test-generation');
+        // if (testForm.style.display === 'none') {
+        //   testForm.style.display = 'block';
+        //   showButton.innerText = 'Hide Test Generation Form';
+        // } else {
+        testForm.style.display = 'none';
+        showButton.innerText = 'Generate Test';
+        // }
+      }
+
+      document.getElementById('show-test-generation').addEventListener('click', toggleTestGeneration);
+
+      // Handle Test Generation Form Submission
+      document.getElementById('generate-test-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const subject = document.getElementById('subject').value;
+        const gradeLevel = document.getElementById('grade-level').value;
+        const topic = document.getElementById('topic').value;
+
+        // Send POST request to generate test
+        fetch('/generate_test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subject: subject,
+            grade_level: gradeLevel,
+            topic: topic
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Display the generated test in the output area
+          const testOutput = document.getElementById('test-output');
+          if (data.diagnostic_test) {
+            testOutput.innerHTML = `<h3>Generated Diagnostic Test:</h3><p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>`;
+          } else if (data.error) {
+            alert(data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Error generating test:', error);
+          alert('An error occurred while generating the test.');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
