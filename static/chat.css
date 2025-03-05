@@ -1,6 +1,6 @@
 /* Chat Container */
 .chat-container {
-  background: #f9f6f2;
+  background: #f2f2f2;
   border-radius: 12px;
   padding: 20px;
   margin-top: 20px;
@@ -11,11 +11,11 @@
 .chat-log {
   max-height: 500px;
   overflow-y: auto;
-  border: 1px solid #e0dcdc;
+  border: 1px solid #dcdcdc;
   padding: 15px;
   margin-bottom: 15px;
   border-radius: 8px;
-  background: #fff;
+  background: #ffffff;
 }
 
 /* Chat Message */
@@ -43,7 +43,7 @@
   font-size: 0.95rem;
   min-height: 50px;
   resize: none;
-  background: #fdfaf6;
+  background: #f5f5f5;
   font-family: 'Poppins', sans-serif;
 }
 
@@ -51,7 +51,7 @@
 .send-button {
   padding: 12px 24px;
   border: none;
-  background: #88b04b;
+  background: #4a90e2;
   color: #fff;
   border-radius: 8px;
   cursor: pointer;
@@ -62,12 +62,12 @@
 }
 
 .send-button:hover {
-  background: #76a040;
+  background: #357ab7;
 }
 
 /* Chat History */
 .chat-history {
-  background: #fff;
+  background: #ffffff;
   padding: 15px;
   border-radius: 8px;
   margin-top: 20px;
@@ -76,7 +76,7 @@
 
 /* Chat Instructions */
 .chat-instructions {
-  background: #fef8f3;
+  background: #e6e6e6;
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;

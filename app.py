@@ -19,6 +19,10 @@ def diagnostic():
 @app.route('/chatbot')
 def chatbot_page():
     return render_template('chatbot.html')
+@app.route('/learning_style')
+def learning_style():
+    return render_template('learning_style.html')
+
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get('message', '')
@@ -54,6 +58,7 @@ def chat():
             "role": "assistant",
             "content": gpt_response
         })
+
         # Return a valid JSON response
         return jsonify({'response': gpt_response})
     except Exception as e:
