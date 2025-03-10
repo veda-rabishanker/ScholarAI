@@ -21,7 +21,7 @@ def chatbot_page():
     return render_template('chatbot.html')
 @app.route('/learning_style')
 def learning_style():
-    return render_template('learning_style.html')
+    return render_template('learning_styles.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
