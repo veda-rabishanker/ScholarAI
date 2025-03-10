@@ -52,7 +52,9 @@ static/
   styles.css
 templates/
   chatbot.html
+  diagnostic.html
   index.html
+  learning_styles.html
 topic_prompts/
   initial_prompt.txt
 app.py
@@ -68,49 +70,112 @@ Files
 ================
 File: static/chat.css
 ================
+/* Chat Container */
 .chat-container {
-    background: #fff;
-    border-radius: 8px;
-    padding: 20px;
-    margin-top: 20px;
+  background: #f2f2f2;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Chat Log */
+.chat-log {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #dcdcdc;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+/* Chat Message */
+.chat-message {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Chat Form */
+.chat-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Chat Input */
+#chat-input {
+  flex: 3;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  min-height: 50px;
+  resize: none;
+  background: #f5f5f5;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Send Button */
+.send-button {
+  padding: 12px 24px;
+  border: none;
+  background: #4a90e2;
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
+}
+
+.send-button:hover {
+  background: #357ab7;
+}
+
+/* Chat History */
+.chat-history {
+  background: #ffffff;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Chat Instructions */
+.chat-instructions {
+  background: #e6e6e6;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chat-instructions h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .chat-form {
+      flex-direction: column;
   }
-  
-  .chat-log {
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 4px;
-  }
-  
-  .chat-message {
-    margin-bottom: 10px;
-  }
-  
-  #chat-form {
-    display: flex;
-  }
-  
+
   #chat-input {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px 0 0 4px;
+      width: 100%;
+      border-radius: 8px;
   }
-  
-  #chat-form button {
-    padding: 10px 20px;
-    border: none;
-    background: #35424a;
-    color: #fff;
-    border-radius: 0 4px 4px 0;
-    cursor: pointer;
+
+  .send-button {
+      width: 100%;
+      border-radius: 8px;
   }
-  
-  #chat-form button:hover {
-    background: #2c3e50;
-  }
+}
 
 ================
 File: static/chat.js
@@ -201,244 +266,284 @@ File: static/styles.css
 ================
 /* Global Styles */
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Merriweather', serif;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+}
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+/* Header Styles */
+header {
+  background: #1b2a4e;
+  color: #ffffff;
+  padding: 25px 0;
+}
+header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 {
+  font-family: 'Playfair Display', serif;
+  margin: 0;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+}
+nav ul li {
+  margin: 0 15px;
+}
+nav ul li a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+nav ul li a:hover {
+  color: #b0bec5;
+}
+/* Hero Section */
+.hero {
+  background: url('https://summer.harvard.edu/wp-content/uploads/sites/7/2022/06/how-to-study-like-a-harvard-student.jpg') no-repeat center center/cover;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #ffffff;
+  position: relative;
+  background-position: center;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(27, 42, 78, 0.7);
+  z-index: 1;
+}
+.hero .container {
+  position: relative;
+  z-index: 2;
+}
+.hero h2 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  font-family: 'Playfair Display', serif;
+}
+.hero p {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+.hero-buttons button {
+  background: #546e7a;
+  border: none;
+  color: #fff;
+  padding: 10px 20px;
+  margin: 0 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+}
+.hero-buttons button:hover {
+  background: #37474f;
+}
+/* Features Section */
+.features {
+  padding: 40px 0;
+  background: #ffffff;
+  text-align: center;
+}
+.features h2 {
+  margin-bottom: 20px;
+  font-family: 'Playfair Display', serif;
+}
+.feature {
+  background: #eceff1;
+  padding: 20px;
+  margin: 20px;
+  display: inline-block;
+  width: 250px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+/* About & Contact Sections */
+.about, .contact {
+  padding: 40px 0;
+  background: #fff;
+  text-align: center;
+}
+.about p{
+  margin-bottom: 20px;
+}
+.about h2, .contact h2 {
+  margin-bottom: 20px;
+  font-family: 'Playfair Display', serif;
+}
+/* Footer */
+footer {
+  background: #1b2a4e;
+  color: #fff;
+  text-align: center;
+  padding: 10px 0;
+  margin-top: 20px;
+}
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  margin: auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 400px;
+  position: relative;
+  animation: fadeIn 0.3s;
+}
+.close {
+  position: absolute;
+  right: 15px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+/* Form Styles */
+form input[type="text"],
+form input[type="password"] {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+form button {
+  width: 100%;
+  background: #1b2a4e;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+form button:hover {
+  background: #102040;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
   }
-  
-  body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-    background-color: #f4f4f4;
-    color: #333;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  
-  .container {
-    width: 90%;
-    max-width: 1200px;
-    margin: auto;
-  }
-  
-  /* Header Styles */
-  header {
-    background: #35424a;
-    color: #ffffff;
-    padding: 20px 0;
-  }
-  
-  header .container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  
-  header h1 {
-    margin: 0;
-  }
-  
-  nav ul {
-    list-style: none;
-    display: flex;
-  }
-  
-  nav ul li {
-    margin: 0 15px;
-  }
-  
-  nav ul li a {
-    color: #ffffff;
-    text-decoration: none;
-    font-weight: bold;
-    transition: color 0.3s;
-  }
-  
-  nav ul li a:hover {
-    color: #e8491d;
-  }
-  
-  /* Hero Section */
-  .hero {
-    background: url('../static/hero-bg.jpg') no-repeat center center/cover;
-    height: 400px;
-    display: flex;
-    align-items: center;
-    text-align: center;
-    color: #ffffff;
-    position: relative;
-  }
-  
-  .hero::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(53, 66, 74, 0.7);
-    z-index: 1;
-  }
-  
-  .hero .container {
-    position: relative;
-    z-index: 2;
-  }
-  
-  .hero h2 {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
-  }
-  
-  .hero p {
-    font-size: 1.2rem;
-    margin-bottom: 20px;
-  }
-  
-  .hero-buttons button {
-    background: #e8491d;
-    border: none;
-    color: #fff;
-    padding: 10px 20px;
-    margin: 0 10px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.3s;
-  }
-  
-  .hero-buttons button:hover {
-    background: #cf3e14;
-  }
-  
-  /* Features Section */
-  .features {
-    padding: 40px 0;
-    background: #fff;
-    text-align: center;
-  }
-  
-  .features h2 {
-    margin-bottom: 20px;
-  }
-  
-  .feature {
-    background: #f4f4f4;
-    padding: 20px;
-    margin: 20px;
-    display: inline-block;
-    width: 250px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* About & Contact Sections */
-  .about, .contact {
-    padding: 40px 0;
-    background: #fff;
-    text-align: center;
-  }
-  
-  .about h2, .contact h2 {
-    margin-bottom: 20px;
-  }
-  
-  /* Footer */
-  footer {
-    background: #35424a;
-    color: #fff;
-    text-align: center;
-    padding: 10px 0;
-    margin-top: 20px;
-  }
-  
-  /* Modal Styles */
-  .modal {
-    display: none; /* Hidden by default */
-    position: fixed;
-    z-index: 100;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.5);
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .modal-content {
-    background: #fff;
-    margin: auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 80%;
-    max-width: 400px;
-    position: relative;
-    animation: fadeIn 0.3s;
-  }
-  
-  .close {
-    position: absolute;
-    right: 15px;
-    top: 10px;
-    font-size: 24px;
-    cursor: pointer;
-  }
-  
-  /* Form Styles */
-  form input[type="text"],
-  form input[type="password"] {
-    width: 100%;
-    padding: 10px;
-    margin: 10px 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  form button {
-    width: 100%;
-    background: #35424a;
-    color: #fff;
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.3s;
-  }
-  
-  form button:hover {
-    background: #2c3e50;
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Responsive Styles */
-  @media (max-width: 768px) {
-    header .container {
-      flex-direction: column;
-    }
-  
-    nav ul {
-      flex-direction: column;
-      margin-top: 10px;
-    }
-  
-    nav ul li {
-      margin: 10px 0;
-    }
-  
-    .feature {
-      width: 80%;
-      margin: 20px auto;
-    }
-  }
+}
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+/* Links inside the dropdown */
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {background-color: #ddd;}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {display: block;}
+
+
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style the dropdown content */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* Show dropdown when hovering over the parent "Tests" button */
+.dropdown:hover .dropdown-content,
+.dropdown-content:hover {
+  display: block;
+}
+
+/* Ensure the dropdown container is positioned correctly */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style the dropdown content */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%; /* Make sure it's directly below the button */
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+/* Ensure no gap between the button and dropdown */
+.dropdown:hover .dropdown-content,
+.dropdown-content:hover {
+  display: block;
+}
+
+/* Optional: Add padding to prevent flickering */
+.dropdown-content {
+  padding: 5px 0;
+}
 
 ================
 File: templates/chatbot.html
@@ -448,33 +553,42 @@ File: templates/chatbot.html
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chatbot</title>
+  <title>Chatbot | Scholar AI</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <!-- Optional: include chat.css for extra styling -->
   <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>AI Chatbot</h1>
+      <h1>Scholar AI Chatbot</h1>
       <nav>
         <ul>
-          <!-- Link to return to the homepage -->
           <li><a href="/">Home</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
+  <section class="chat-instructions container">
+    <h2>How to Use</h2>
+    <p>Welcome to the Scholar AI Chatbot! Type your queries in the input box and press 'Send' to start a conversation with our AI-powered assistant.</p>
+    <ul>
+      <li>Ask educational questions and get AI-generated responses.</li>
+      <li>Use clear and concise language for better responses.</li>
+      <li>Enjoy interactive and engaging learning!</li>
+    </ul>
+  </section>
+
   <main class="chat-container container">
     <div id="chat-box" class="chat-log">
       <!-- Chat messages will appear here -->
     </div>
-    <form id="chat-form">
-      <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" required>
-      <button type="submit">Send</button>
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" placeholder="Type your message here..." autocomplete="off" required></textarea>
+      <button type="submit" class="send-button">Send</button>
     </form>
   </main>
+
 
   <footer>
     <div class="container">
@@ -487,80 +601,102 @@ File: templates/chatbot.html
 </html>
 
 ================
-File: templates/index.html
+File: templates/diagnostic.html
 ================
-<!--
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Scholar AI</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='styles.css') }}"
-    />
-    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
-  </head>
-  <body>
-    <header>
-      <h1>Scholar AI</h1>
-    </header>
-
-    <section class="hero">
-      <h2>AI-Powered Learning for Everyone</h2>
-      <p>Enhance your teaching and learning experience with Scholar AI.</p>
-      <button onclick="showSignIn()">Sign In</button>
-      <button onclick="showSignUp()">Sign Up</button>
-    </section>
-
- 
-    <div id="sign-in-modal" class="modal">
-      <h2>Sign In</h2>
-      <input type="text" id="login-username" placeholder="Username" required />
-      <input
-        type="password"
-        id="login-password"
-        placeholder="Password"
-        required
-      />
-      <button onclick="signIn()">Sign In</button>
-      <button onclick="toggleSignIn()">Close</button>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostic Test | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Scholar AI Chatbot</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li class="dropdown">
+            <a href="javascript:void(0)" class="dropbtn">Tests</a>
+            <div class="dropdown-content">
+              <a href="/diagnostic">Diagnostic Test</a>
+              <a href="/learning_style">Learning Style</a>
+            </div>
+          </li>
+          <li><a href="/chatbot">Chatbot</a></li>
+        </ul>
+      </nav>
     </div>
+  </header>
 
-
-    <div id="sign-up-modal" class="modal">
-      <h2>Sign Up</h2>
-      <input type="text" id="signup-username" placeholder="Username" required />
-      <input
-        type="password"
-        id="signup-password"
-        placeholder="Password"
-        required
-      />
-      <button onclick="signUp()">Sign Up</button>
-      <button onclick="toggleSignUp()">Close</button>
+  <main class="chat-container container">
+    <!-- Diagnostic Test Form (always visible) -->
+    <div id="diagnostic-test-section">
+      <h2>Generate a Diagnostic Test</h2>
+      <form id="generate-test-form">
+        <label for="subject">Subject:</label> 
+        <input type="text" id="subject" placeholder="Enter subject (e.g., Mathematics)" required>
+    
+        <label for="grade-level">Grade Level:</label>
+        <input type="text" id="grade-level" placeholder="Enter grade level (e.g., 7)" required>
+    
+        <label for="topic">Topic:</label>
+        <input type="text" id="topic" placeholder="Enter topic (e.g., Algebra)" required>
+    
+        <button type="submit">Generate Test</button>
+      </form>
+    
+      <!-- Display generated test here -->
+      <div id="test-output" class="test-box" aria-live="polite"></div>
     </div>
+  </main>
 
-    <section class="features">
-      <h2>Key Features</h2>
-      <div class="feature">
-        <h3>Interactive AI Tutor</h3>
-        <p>Get real-time assistance with AI-powered tutoring.</p>
-      </div>
-      <div class="feature">
-        <h3>Lesson Planning</h3>
-        <p>AI-generated lesson plans tailored to your needs.</p>
-      </div>
-      <div class="feature">
-        <h3>Student Analytics</h3>
-        <p>Track and improve student performance with AI insights.</p>
-      </div>
-    </section>
-  </body>
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+  <script>
+    // Existing form submission logic remains unchanged
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById('generate-test-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const subject = document.getElementById('subject').value;
+        const gradeLevel = document.getElementById('grade-level').value;
+        const topic = document.getElementById('topic').value;
+    
+        fetch('/generate_test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: subject, grade_level: gradeLevel, topic: topic })
+        })
+        .then(response => response.json())
+        .then(data => {
+          const testOutput = document.getElementById('test-output');
+          if (data.diagnostic_test) {
+            testOutput.innerHTML = `<h3>Generated Diagnostic Test:</h3><p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>`;
+          } else if (data.error) {
+            alert(data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Error generating test:', error);
+          alert('An error occurred while generating the test.');
+        });
+      });
+    });
+  </script>
+</body>
 </html>
--->
 
+================
+File: templates/index.html
+================
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -576,17 +712,19 @@ File: templates/index.html
       <h1>Scholar AI</h1>
       <nav>
         <ul>
-          <li><a href="#hero">Home</a></li>
-          <li><a href="#features">Features</a></li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#contact">Contact</a></li>
-          <!-- New link to switch to the Chatbot page -->
+          <li><a href="/">Home</a></li>
+          <li class="dropdown">
+            <a href="javascript:void(0)" class="dropbtn">Tests</a>
+            <div class="dropdown-content">
+              <a href="/diagnostic">Diagnostic Test</a>
+              <a href="/learning_style">Learning Style</a>
+            </div>
+          </li>
           <li><a href="/chatbot">Chatbot</a></li>
         </ul>
       </nav>
     </div>
   </header>
-
   <section id="hero" class="hero">
     <div class="container">
       <h2>AI-Powered Learning for Everyone</h2>
@@ -597,7 +735,6 @@ File: templates/index.html
       </div>
     </div>
   </section>
-
   <!-- Sign In Modal -->
   <div id="sign-in-modal" class="modal">
     <div class="modal-content">
@@ -610,12 +747,12 @@ File: templates/index.html
       </form>
     </div>
   </div>
-
   <!-- Sign Up Modal -->
   <div id="sign-up-modal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="toggleModal('sign-up-modal')">&times;</span>
       <h2>Sign Up</h2>
+      <!-- this should be commented out -->
       <form id="sign-up-form">
         <input type="text" id="signup-username" placeholder="Username" required />
         <input type="password" id="signup-password" placeholder="Password" required />
@@ -623,7 +760,6 @@ File: templates/index.html
       </form>
     </div>
   </div>
-
   <section id="features" class="features">
     <div class="container">
       <h2>Key Features</h2>
@@ -641,14 +777,14 @@ File: templates/index.html
       </div>
     </div>
   </section>
-
   <section id="about" class="about">
     <div class="container">
       <h2>About Scholar AI</h2>
       <p>Scholar AI leverages cutting-edge artificial intelligence to enhance educational experiences for both teachers and students.</p>
+      <p></p>
+      <p>To utilize ScholarAI make sure to head to the diagnostic page before getting feadback from our AI.</p>
     </div>
   </section>
-
   <section id="contact" class="contact">
     <div class="container">
       <h2>Contact Us</h2>
@@ -658,7 +794,6 @@ File: templates/index.html
       </p>
     </div>
   </section>
-
   <footer>
     <div class="container">
       <p>&copy; 2025 Scholar AI. All rights reserved.</p>
@@ -668,17 +803,418 @@ File: templates/index.html
 </html>
 
 ================
+File: templates/learning_styles.html
+================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learning Style Diagnostic Test | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}" />
+  <style>
+    /* Optional styling for the likert scale */
+    .likert-scale {
+      display: flex;
+      justify-content: space-between;
+      max-width: 500px;
+      margin: 10px 0;
+    }
+    .likert-scale input[type="radio"] {
+      margin: 0 5px;
+    }
+    .likert-scale label {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Learning Style Diagnostic Test</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/diagnostic">Diagnostic Test</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section>
+      <h2>Instructions</h2>
+      <p>
+        For each statement below, please select your level of agreement on a 5-point scale.
+        The far left option means “Agree” and the far right means “Disagree.” The three middle choices
+        represent intermediate responses. Answer all 20 questions honestly to help determine your best learning style.
+      </p>
+    </section>
+
+    <form id="learning-style-form">
+      <ol>
+        <!-- Question 1 (Kinesthetic) -->
+        <li>
+          <p>I prefer hands-on learning activities to understand new concepts.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q1" value="1" id="q1a" required /><label for="q1a">Agree</label>
+            <input type="radio" name="q1" value="2" id="q1b" />
+            <input type="radio" name="q1" value="3" id="q1c" />
+            <input type="radio" name="q1" value="4" id="q1d" />
+            <input type="radio" name="q1" value="5" id="q1e" /><label for="q1e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 2 (Auditory) -->
+        <li>
+          <p>I learn best by listening to lectures or discussions.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q2" value="1" id="q2a" required /><label for="q2a">Agree</label>
+            <input type="radio" name="q2" value="2" id="q2b" />
+            <input type="radio" name="q2" value="3" id="q2c" />
+            <input type="radio" name="q2" value="4" id="q2d" />
+            <input type="radio" name="q2" value="5" id="q2e" /><label for="q2e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 3 (Visual) -->
+        <li>
+          <p>I learn best when information is presented in charts, graphs, or diagrams.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q3" value="1" id="q3a" required /><label for="q3a">Agree</label>
+            <input type="radio" name="q3" value="2" id="q3b" />
+            <input type="radio" name="q3" value="3" id="q3c" />
+            <input type="radio" name="q3" value="4" id="q3d" />
+            <input type="radio" name="q3" value="5" id="q3e" /><label for="q3e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 4 (Reading/Writing) -->
+        <li>
+          <p>I prefer learning through reading texts and writing notes.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q4" value="1" id="q4a" required /><label for="q4a">Agree</label>
+            <input type="radio" name="q4" value="2" id="q4b" />
+            <input type="radio" name="q4" value="3" id="q4c" />
+            <input type="radio" name="q4" value="4" id="q4d" />
+            <input type="radio" name="q4" value="5" id="q4e" /><label for="q4e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 5 (Kinesthetic) -->
+        <li>
+          <p>I learn best when I physically engage with the material through experiments or real-world practice.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q5" value="1" id="q5a" required /><label for="q5a">Agree</label>
+            <input type="radio" name="q5" value="2" id="q5b" />
+            <input type="radio" name="q5" value="3" id="q5c" />
+            <input type="radio" name="q5" value="4" id="q5d" />
+            <input type="radio" name="q5" value="5" id="q5e" /><label for="q5e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 6 (Auditory) -->
+        <li>
+          <p>I remember information better when I hear it explained verbally.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q6" value="1" id="q6a" required /><label for="q6a">Agree</label>
+            <input type="radio" name="q6" value="2" id="q6b" />
+            <input type="radio" name="q6" value="3" id="q6c" />
+            <input type="radio" name="q6" value="4" id="q6d" />
+            <input type="radio" name="q6" value="5" id="q6e" /><label for="q6e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 7 (Visual) -->
+        <li>
+          <p>I find it easier to understand complex concepts when I see them visually represented.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q7" value="1" id="q7a" required /><label for="q7a">Agree</label>
+            <input type="radio" name="q7" value="2" id="q7b" />
+            <input type="radio" name="q7" value="3" id="q7c" />
+            <input type="radio" name="q7" value="4" id="q7d" />
+            <input type="radio" name="q7" value="5" id="q7e" /><label for="q7e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 8 (Reading/Writing) -->
+        <li>
+          <p>I find that writing summaries or lists helps me understand and remember information.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q8" value="1" id="q8a" required /><label for="q8a">Agree</label>
+            <input type="radio" name="q8" value="2" id="q8b" />
+            <input type="radio" name="q8" value="3" id="q8c" />
+            <input type="radio" name="q8" value="4" id="q8d" />
+            <input type="radio" name="q8" value="5" id="q8e" /><label for="q8e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 9 (Kinesthetic) -->
+        <li>
+          <p>I often remember information better when I can touch or manipulate objects related to the subject.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q9" value="1" id="q9a" required /><label for="q9a">Agree</label>
+            <input type="radio" name="q9" value="2" id="q9b" />
+            <input type="radio" name="q9" value="3" id="q9c" />
+            <input type="radio" name="q9" value="4" id="q9d" />
+            <input type="radio" name="q9" value="5" id="q9e" /><label for="q9e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 10 (Auditory) -->
+        <li>
+          <p>I prefer to discuss topics with others to understand them.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q10" value="1" id="q10a" required /><label for="q10a">Agree</label>
+            <input type="radio" name="q10" value="2" id="q10b" />
+            <input type="radio" name="q10" value="3" id="q10c" />
+            <input type="radio" name="q10" value="4" id="q10d" />
+            <input type="radio" name="q10" value="5" id="q10e" /><label for="q10e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 11 (Visual) -->
+        <li>
+          <p>I often use visual aids such as images or videos to support my learning.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q11" value="1" id="q11a" required /><label for="q11a">Agree</label>
+            <input type="radio" name="q11" value="2" id="q11b" />
+            <input type="radio" name="q11" value="3" id="q11c" />
+            <input type="radio" name="q11" value="4" id="q11d" />
+            <input type="radio" name="q11" value="5" id="q11e" /><label for="q11e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 12 (Reading/Writing) -->
+        <li>
+          <p>I often use written instructions or textbooks to study new topics.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q12" value="1" id="q12a" required /><label for="q12a">Agree</label>
+            <input type="radio" name="q12" value="2" id="q12b" />
+            <input type="radio" name="q12" value="3" id="q12c" />
+            <input type="radio" name="q12" value="4" id="q12d" />
+            <input type="radio" name="q12" value="5" id="q12e" /><label for="q12e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 13 (Kinesthetic) -->
+        <li>
+          <p>I find it easier to understand instructions if I can perform the task immediately.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q13" value="1" id="q13a" required /><label for="q13a">Agree</label>
+            <input type="radio" name="q13" value="2" id="q13b" />
+            <input type="radio" name="q13" value="3" id="q13c" />
+            <input type="radio" name="q13" value="4" id="q13d" />
+            <input type="radio" name="q13" value="5" id="q13e" /><label for="q13e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 14 (Auditory) -->
+        <li>
+          <p>I often use my voice to help memorize and process information.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q14" value="1" id="q14a" required /><label for="q14a">Agree</label>
+            <input type="radio" name="q14" value="2" id="q14b" />
+            <input type="radio" name="q14" value="3" id="q14c" />
+            <input type="radio" name="q14" value="4" id="q14d" />
+            <input type="radio" name="q14" value="5" id="q14e" /><label for="q14e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 15 (Visual) -->
+        <li>
+          <p>I prefer reading materials that include pictures or infographics.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q15" value="1" id="q15a" required /><label for="q15a">Agree</label>
+            <input type="radio" name="q15" value="2" id="q15b" />
+            <input type="radio" name="q15" value="3" id="q15c" />
+            <input type="radio" name="q15" value="4" id="q15d" />
+            <input type="radio" name="q15" value="5" id="q15e" /><label for="q15e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 16 (Reading/Writing) -->
+        <li>
+          <p>I enjoy taking detailed notes and rewriting them to reinforce my learning.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q16" value="1" id="q16a" required /><label for="q16a">Agree</label>
+            <input type="radio" name="q16" value="2" id="q16b" />
+            <input type="radio" name="q16" value="3" id="q16c" />
+            <input type="radio" name="q16" value="4" id="q16d" />
+            <input type="radio" name="q16" value="5" id="q16e" /><label for="q16e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 17 (Kinesthetic) -->
+        <li>
+          <p>I enjoy learning through physical activities and interactive experiences.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q17" value="1" id="q17a" required /><label for="q17a">Agree</label>
+            <input type="radio" name="q17" value="2" id="q17b" />
+            <input type="radio" name="q17" value="3" id="q17c" />
+            <input type="radio" name="q17" value="4" id="q17d" />
+            <input type="radio" name="q17" value="5" id="q17e" /><label for="q17e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 18 (Auditory) -->
+        <li>
+          <p>I find that listening to audio recordings aids my learning.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q18" value="1" id="q18a" required /><label for="q18a">Agree</label>
+            <input type="radio" name="q18" value="2" id="q18b" />
+            <input type="radio" name="q18" value="3" id="q18c" />
+            <input type="radio" name="q18" value="4" id="q18d" />
+            <input type="radio" name="q18" value="5" id="q18e" /><label for="q18e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 19 (Visual) -->
+        <li>
+          <p>I recall information better when I see it in written or drawn form.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q19" value="1" id="q19a" required /><label for="q19a">Agree</label>
+            <input type="radio" name="q19" value="2" id="q19b" />
+            <input type="radio" name="q19" value="3" id="q19c" />
+            <input type="radio" name="q19" value="4" id="q19d" />
+            <input type="radio" name="q19" value="5" id="q19e" /><label for="q19e">Disagree</label>
+          </div>
+        </li>
+
+        <!-- Question 20 (Reading/Writing) -->
+        <li>
+          <p>I excel in learning when I can engage with material through extensive reading and reflective writing.</p>
+          <div class="likert-scale">
+            <input type="radio" name="q20" value="1" id="q20a" required /><label for="q20a">Agree</label>
+            <input type="radio" name="q20" value="2" id="q20b" />
+            <input type="radio" name="q20" value="3" id="q20c" />
+            <input type="radio" name="q20" value="4" id="q20d" />
+            <input type="radio" name="q20" value="5" id="q20e" /><label for="q20e">Disagree</label>
+          </div>
+        </li>
+      </ol>
+
+      <button type="submit">Submit Test</button>
+    </form>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Optional: add JavaScript to handle form submission -->
+  <script>
+    document.getElementById('learning-style-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      // Gather responses here and send them to your backend for processing.
+      // For example, you might collect form data, compute scores for each learning style,
+      // and then display personalized feedback.
+      alert('Test submitted! (Backend processing not yet implemented)');
+    });
+  </script>
+</body>
+</html>
+
+================
 File: topic_prompts/initial_prompt.txt
 ================
 Everytime someone runs this program erase all previous data about this person and start off by saying "Hi I am scholar AI how many I help you today?"
 
-You are a scholar AI robot that only helps people learn.
+Role & Purpose
+You are an AI Scholar, an intelligent and adaptive tutoring assistant designed to help students diagnose their weaknesses, create study schedules, and provide targeted learning resources. Your goal is to identify student strengths and weaknesses through diagnostic tests and generate personalized study plans that fit their learning style and schedule.
+Core Functionality
+1. Course Selection & Customization
+Upon startup, ask the student:
+"Which subject would you like to study?"
+"Are there specific topics or a syllabus you’d like to follow?"
+If they provide a syllabus, structure the diagnostic and study plan accordingly.
+If not, create a well-balanced test covering essential topics.
+"Do you have a timeline or deadline for your studies?"
 
-First ask the student what subject they would like to study. If they try to get off topic keep asking them till a response
+2. Diagnostic Testing
+Before providing study materials, administer a 15-question diagnostic test (or 20 questions for AP/IB courses). The test should include:
+Multiple-Choice Questions (MCQs) to assess factual understanding and problem-solving skills.
+Free-Response Questions (FRQs) to evaluate deeper comprehension and application of concepts.
+Examples:
+For Algebra:
+MCQ: "Solve for x in 2x + 3 = 15."
+FRQ: "Explain how the quadratic formula is derived and solve x² - 4x - 5 = 0."
+For Biology:
+MCQ: "What is the function of mitochondria in a cell?"
+FRQ: "Describe the process of cellular respiration, including key reactants and products."
+For SAT Math:
+MCQ: "What is the slope of the line passing through (3,4) and (7,10)?"
+FRQ: "Solve the following system of equations and explain your method."
 
-Then ask them about the grade level and the specific topic. Once they give that start teaching them.
+3. Strengths & Weaknesses Analysis
+Once the student completes the diagnostic test, analyze their strong and weak areas. Provide a detailed report that:
+Lists the topics they performed well in 
+Identifies weak points that need improvement 
+Gives an explanation of their errors, if applicable.
+
+4. Learning Style Assessment
+Before creating a study plan, ask:
+ "What is your preferred learning style?"
+ Provide descriptions of common learning styles:
+Visual Learner – Prefers diagrams, charts, and videos.
+Auditory Learner – Learns best through listening (lectures, podcasts).
+Reading/Writing Learner – Retains information through text-based materials.
+Kinesthetic Learner – Learns best with hands-on practice and real-world examples.
+Mixed Learning Style – A combination of two or more of the above.
+
+5. Personalized Study Plan & Schedule
+Based on weak areas and learning style, generate a custom study schedule that fits their availability.
+Ask: "How many hours per day/week can you dedicate to studying?"
+Adapt the study plan to their deadlines and pace.
+If they fall behind, suggest a catch-up plan.
+
+6. Learning Resources & Study Materials
+For each weak topic, provide:
+    Khan Academy Videos
+Summarize each video and explain its relevance.
+Example: "This Khan Academy video explains Newton's Laws with animations—useful for understanding force and motion."
+    Quizlet Flashcard Sets (if available)
+Example: "This Quizlet set covers SAT vocabulary and key math formulas."
+    MIT OpenCourseWare Links
+Provide links to relevant lecture notes and problem sets.
+    Additional YouTube Videos
+Search for and recommend videos that align with the student’s weak areas.
+
+7. ACT/SAT Prep (If Selected)
+If the student chooses ACT/SAT prep, ask:
+"What is your target score?"
+"Which sections do you struggle with the most?"
+Generate a section-wise prep plan with:
+Timed practice tests
+Strategy guides
+Concept explanations
+
+8. Teacher & Assignment Integration (Future Feature)
+If used in a classroom, allow teachers to:
+Assign diagnostic tests and projects
+Set deadlines
+Track student progress
+A potential paid version could include additional teacher tools for managing students and assignments.
+
+9. Deadline Management
+Allow students to set deadlines for topics/tests.
+Send reminders and progress updates.
+Adjust schedules dynamically if they fall behind.
+
+Behavioral Guidelines
+Be student-friendly: Provide clear, engaging, and supportive responses.
+Be flexible: Adapt to different learning paces.
+Avoid overloading students: Balance study plans to prevent burnout.
+Encourage progress tracking: Motivate students with milestones.
 
 
+Student has chosen the subject: General
+<<<<<<< HEAD
+=======
 
 
 Student has chosen the subject: General
@@ -688,6 +1224,10 @@ Student has chosen the subject: General
 
 
 Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+>>>>>>> dea6026bffe0ddb9bba95bace6b5a565d2a987fe
 
 ================
 File: app.py
@@ -696,26 +1236,26 @@ from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 import openai
 import os
-
 app = Flask(__name__)
-
 # Session configuration
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
-
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+openai.api_key = ''
 app.secret_key = 'supersecretkey'
-
-
 # Home route
 @app.route('/')
 def home():
     return render_template('index.html')
-
+@app.route('/diagnostic')
+def diagnostic():
+    return render_template('diagnostic.html')
 @app.route('/chatbot')
 def chatbot_page():
     return render_template('chatbot.html')
+@app.route('/learning_style')
+def learning_style():
+    return render_template('learning_style.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -727,25 +1267,18 @@ def chat():
     
     if user_message:
         session['conversation'].append({"role": "user", "content": user_message})
-
     text_file_path = 'topic_prompts/initial_prompt.txt'
-
     # Ensure the directory exists
     os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
-
     # Ensure the file exists before appending
     if not os.path.exists(text_file_path):
         with open(text_file_path, 'w') as file:
             file.write("Initial prompt for chatbot interaction.\n")
-
     with open(text_file_path, 'a') as file: 
         file.write(f"\n\nStudent has chosen the subject: {subject}\n")
-
     with open(text_file_path, 'r') as file:
         initial_prompt = file.read()
-
     messages = [{"role": "system", "content": initial_prompt}] + session['conversation']
-
     try:
         # Make API call to OpenAI using the messages
         response = openai.chat.completions.create(
@@ -754,7 +1287,6 @@ def chat():
         )
         # Extract the content from the response
         gpt_response = response.choices[0].message.content
-
         # Append the GPT response to the conversation history
         session['conversation'].append({
             "role": "assistant",
@@ -766,79 +1298,13 @@ def chat():
     except Exception as e:
         app.logger.error(f"An error occurred: {e}")
         return jsonify({'error': str(e)}), 500
-
    
-
-'''
-# Chat route - handles the conversation with the LLM
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_message = request.json['message', '']
-    subject = requestion.json['subject', 'General Knowledge']
-    # animal_type = request.json['animalType']
-
-    if 'conversation' not in session:
-        session['conversation'] = []
-    if user_message:
-        # Append the user's message to the conversation
-        session['conversation'].append({"role": "user", "content": user_message})
-
-    # Read the initial prompt from the file
-    text_file_path = 'topic_prompts/initial_prompt.txt'
-    if os.path.exists(text_file_path):
-        with open(text_file_path, 'a') as file: 
-            file.write(f"\n\nStudent has chosen the subject: {subject}\n")
-
-    with open(text_file_path, 'r') as file:
-        initial_prompt = file.read()
-
-    # Construct the system message
-    # system_message = f"The user is showing a picture of a {animal_type}. Respond accordingly"
-
-    # The messages structure for the API call
-
-    # messages = [{
-    #     "role": "system",
-    #     "content": initial_prompt
-    # }, {
-    #     "role": "system",
-    #     "content": system_message
-    # }] + session['conversation']
-
-    messages = [{
-        "role": "system",
-        "content": initial_prompt
-    }] + session['conversation']
-
-    try:
-        # Make API call to OpenAI using the messages
-        response = openai.chat.completions.create(model="gpt-3.5-turbo-1106",
-                                                  messages=messages)
-        # Extract the content from the response
-        gpt_response = response.choices[0].message.content
-
-        # Append the GPT response to the conversation history
-        session['conversation'].append({
-            "role": "assistant",
-            "content": gpt_response
-        })
-
-        # Return the GPT response
-        return jsonify({'response': gpt_response})
-    except Exception as e:
-        # Log the error and return a message
-        app.logger.error(f"An error occurred: {e}")
-        return jsonify({'error': str(e)}), 500
-
-'''
 # Clear session route
 @app.route('/clear_session', methods=['GET'])
 def clear_session():
     # Clear the session
     session.clear()
     return jsonify({'status': 'session cleared'})
-
-
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
 
