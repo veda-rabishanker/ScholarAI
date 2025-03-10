@@ -5,42 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Learning Style Diagnostic Test | Scholar AI</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}" />
   <style>
-    /* Style each question box */
+    /* Basic styling for the slider-based test */
     ol li {
-      background-color: #e5e1e1;
+      background-color: #e4e1e1;
       border-radius: 8px;
       padding: 15px;
       margin-bottom: 15px;
     }
-    /* Likert scale container */
-    .likert-scale {
+    .slider-container {
       display: flex;
+      align-items: center;
       max-width: 500px;
-      margin: 10px 0;
+      margin-top: 10px;
     }
-    /* Each option container */
-    .likert-scale .option {
-      flex: 1;
-    }
-    .option-left {
-      text-align: left;
-    }
-    .option-middle {
-      text-align: center;
-    }
-    .option-right {
-      text-align: right;
-    }
-    /* Style radio buttons and labels */
-    .likert-scale input[type="radio"] {
-      margin-right: 5px;
-    }
-    .likert-scale label {
+    .slider-label {
+      width: 60px;
       font-weight: bold;
     }
-    /* Custom styles for the result modal (similar to your sign-in/up modals) */
+    .slider {
+      flex: 1;
+      margin: 0 10px;
+      -webkit-appearance: none;
+      height: 10px;
+      border-radius: 5px;
+      background: #ccc;
+      outline: none;
+    }
+    /* Webkit Thumb */
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #295281;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    /* Styling for the result modal */
     #result-modal {
       display: none;
       position: fixed;
@@ -72,12 +76,16 @@
       font-size: 24px;
       cursor: pointer;
     }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>Learning Style</h1>
+      <h1>Learning Style Diagnostic Test</h1>
       <nav>
         <ul>
           <li><a href="/">Home</a></li>
@@ -92,9 +100,9 @@
     <section>
       <h2>Instructions</h2>
       <p>
-        For each statement below, please select your level of agreement on a 5-point scale.
-        The far left option means “Agree” and the far right means “Disagree.” The three middle choices
-        represent intermediate responses. Answer all 20 questions honestly to help determine your best learning style.
+        For each statement below, adjust the slider to indicate your level of agreement.
+        The left end represents "Agree" and the right end "Disagree." The slider's midpoint is neutral.
+        Answer all 20 questions honestly to help determine your best learning style.
       </p>
     </section>
 
@@ -103,505 +111,196 @@
         <!-- Question 1 (Kinesthetic) -->
         <li>
           <p>I prefer hands-on learning activities to understand new concepts.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q1a">Agree</label>
-              <input type="radio" name="q1" value="1" id="q1a" required />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q1" value="2" id="q1b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q1" value="3" id="q1c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q1" value="4" id="q1d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q1" value="5" id="q1e" />
-              <label for="q1e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q1" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
-        <!-- Question 2 (Auditory) -->
+        <!-- Question 2 (Visual) -->
         <li>
-          <p>I learn best by listening to lectures or discussions.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q2a">Agree</label>
-              <input type="radio" name="q2" value="1" id="q2a" required />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q2" value="2" id="q2b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q2" value="3" id="q2c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q2" value="4" id="q2d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q2" value="5" id="q2e" />
-              <label for="q2e">Disagree</label>
-            </div>
+          <p>I learn best when I use diagrams, charts, or other visual aids.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q2" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
-        <!-- Question 3 (Visual) -->
+        <!-- Question 3 (Auditory) -->
         <li>
-          <p>I learn best when information is presented in charts, graphs, or diagrams.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q3a">Agree</label>
-              <input type="radio" name="q3" value="1" id="q3a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q3" value="2" id="q3b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q3" value="3" id="q3c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q3" value="4" id="q3d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q3" value="5" id="q3e" />
-              <label for="q3e">Disagree</label>
-            </div>
+          <p>I remember things better when I hear them rather than when I read them.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q3" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 4 (Reading/Writing) -->
         <li>
-          <p>I prefer learning through reading texts and writing notes.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q4a">Agree</label>
-              <input type="radio" name="q4" value="1" id="q4a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q4" value="2" id="q4b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q4" value="3" id="q4c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q4" value="4" id="q4d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q4" value="5" id="q4e" />
-              <label for="q4e">Disagree</label>
-            </div>
+          <p>I learn best when I take notes or write summaries of what I'm studying.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q4" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 5 (Kinesthetic) -->
         <li>
-          <p>I learn best when I physically engage with the material through experiments or real-world practice.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q5a">Agree</label>
-              <input type="radio" name="q5" value="1" id="q5a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q5" value="2" id="q5b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q5" value="3" id="q5c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q5" value="4" id="q5d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q5" value="5" id="q5e" />
-              <label for="q5e">Disagree</label>
-            </div>
+          <p>I enjoy learning through physical movement or role-playing activities.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q5" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 6 (Auditory) -->
         <li>
-          <p>I remember information better when I hear it explained verbally.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q6a">Agree</label>
-              <input type="radio" name="q6" value="1" id="q6a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q6" value="2" id="q6b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q6" value="3" id="q6c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q6" value="4" id="q6d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q6" value="5" id="q6e" />
-              <label for="q6e">Disagree</label>
-            </div>
+          <p>I learn best by listening to lectures or discussions.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q6" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 7 (Visual) -->
         <li>
-          <p>I find it easier to understand complex concepts when I see them visually represented.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q7a">Agree</label>
-              <input type="radio" name="q7" value="1" id="q7a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q7" value="2" id="q7b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q7" value="3" id="q7c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q7" value="4" id="q7d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q7" value="5" id="q7e" />
-              <label for="q7e">Disagree</label>
-            </div>
+          <p>I find it easier to understand complex concepts when I see them visually.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q7" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 8 (Reading/Writing) -->
         <li>
           <p>I find that writing summaries or lists helps me understand and remember information.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q8a">Agree</label>
-              <input type="radio" name="q8" value="1" id="q8a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q8" value="2" id="q8b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q8" value="3" id="q8c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q8" value="4" id="q8d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q8" value="5" id="q8e" />
-              <label for="q8e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q8" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 9 (Kinesthetic) -->
         <li>
           <p>I often remember information better when I can touch or manipulate objects related to the subject.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q9a">Agree</label>
-              <input type="radio" name="q9" value="1" id="q9a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q9" value="2" id="q9b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q9" value="3" id="q9c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q9" value="4" id="q9d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q9" value="5" id="q9e" />
-              <label for="q9e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q9" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 10 (Auditory) -->
         <li>
           <p>I prefer to discuss topics with others to understand them.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q10a">Agree</label>
-              <input type="radio" name="q10" value="1" id="q10a" required />
-             
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q10" value="2" id="q10b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q10" value="3" id="q10c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q10" value="4" id="q10d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q10" value="5" id="q10e" />
-              <label for="q10e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q10" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 11 (Visual) -->
         <li>
           <p>I often use visual aids such as images or videos to support my learning.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q11a">Agree</label>
-              <input type="radio" name="q11" value="1" id="q11a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q11" value="2" id="q11b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q11" value="3" id="q11c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q11" value="4" id="q11d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q11" value="5" id="q11e" />
-              <label for="q11e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q11" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 12 (Reading/Writing) -->
         <li>
           <p>I often use written instructions or textbooks to study new topics.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q12a">Agree</label>
-              <input type="radio" name="q12" value="1" id="q12a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q12" value="2" id="q12b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q12" value="3" id="q12c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q12" value="4" id="q12d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q12" value="5" id="q12e" />
-              <label for="q12e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q12" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 13 (Kinesthetic) -->
         <li>
           <p>I find it easier to understand instructions if I can perform the task immediately.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q13a">Agree</label>
-              <input type="radio" name="q13" value="1" id="q13a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q13" value="2" id="q13b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q13" value="3" id="q13c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q13" value="4" id="q13d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q13" value="5" id="q13e" />
-              <label for="q13e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q13" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 14 (Auditory) -->
         <li>
           <p>I often use my voice to help memorize and process information.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q14a">Agree</label>
-              <input type="radio" name="q14" value="1" id="q14a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q14" value="2" id="q14b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q14" value="3" id="q14c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q14" value="4" id="q14d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q14" value="5" id="q14e" />
-              <label for="q14e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q14" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 15 (Visual) -->
         <li>
           <p>I prefer reading materials that include pictures or infographics.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q15a">Agree</label>
-              <input type="radio" name="q15" value="1" id="q15a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q15" value="2" id="q15b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q15" value="3" id="q15c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q15" value="4" id="q15d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q15" value="5" id="q15e" />
-              <label for="q15e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q15" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 16 (Reading/Writing) -->
         <li>
           <p>I enjoy taking detailed notes and rewriting them to reinforce my learning.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q16a">Agree</label>
-              <input type="radio" name="q16" value="1" id="q16a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q16" value="2" id="q16b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q16" value="3" id="q16c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q16" value="4" id="q16d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q16" value="5" id="q16e" />
-              <label for="q16e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q16" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 17 (Kinesthetic) -->
         <li>
           <p>I enjoy learning through physical activities and interactive experiences.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q17a">Agree</label>
-              <input type="radio" name="q17" value="1" id="q17a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q17" value="2" id="q17b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q17" value="3" id="q17c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q17" value="4" id="q17d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q17" value="5" id="q17e" />
-              <label for="q17e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q17" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 18 (Auditory) -->
         <li>
           <p>I find that listening to audio recordings aids my learning.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q18a">Agree</label>
-              <input type="radio" name="q18" value="1" id="q18a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q18" value="2" id="q18b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q18" value="3" id="q18c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q18" value="4" id="q18d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q18" value="5" id="q18e" />
-              <label for="q18e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q18" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 19 (Visual) -->
         <li>
           <p>I recall information better when I see it in written or drawn form.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q19a">Agree</label>
-              <input type="radio" name="q19" value="1" id="q19a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q19" value="2" id="q19b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q19" value="3" id="q19c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q19" value="4" id="q19d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q19" value="5" id="q19e" />
-              <label for="q19e">Disagree</label>
-            </div>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q19" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
-
         <!-- Question 20 (Reading/Writing) -->
         <li>
-          <p>I excel in learning when I can engage with material through extensive reading and reflective writing.</p>
-          <div class="likert-scale">
-            <div class="option option-left">
-              <label for="q20a">Agree</label>
-              <input type="radio" name="q20" value="1" id="q20a" required />
-              
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q20" value="2" id="q20b" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q20" value="3" id="q20c" />
-            </div>
-            <div class="option option-middle">
-              <input type="radio" name="q20" value="4" id="q20d" />
-            </div>
-            <div class="option option-right">
-              <input type="radio" name="q20" value="5" id="q20e" />
-              <label for="q20e">Disagree</label>
-            </div>
+          <p>I enjoy writing out detailed explanations to help myself understand a topic better.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q20" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
           </div>
         </li>
       </ol>
-
       <button type="submit">Submit Test</button>
     </form>
   </main>
+
+  <!-- Result Modal -->
+  <div id="result-modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeResultModal()">&times;</span>
+      <h2>Your Preferred Learning Style</h2>
+      <p id="result-text"></p>
+    </div>
+  </div>
 
   <footer>
     <div class="container">
@@ -610,64 +309,75 @@
   </footer>
 
   <script>
+    // Update each slider's background so blue fills from the center.
+    const sliders = document.querySelectorAll('.slider');
+    sliders.forEach(slider => {
+      slider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        if (val >= 50) {
+          // For values above center, blue fills from 50% to current value.
+          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc 50%, #4a90e2 50%, #4a90e2 ${val}%, #ccc ${val}%, #ccc 100%)`;
+        } else {
+          // For values below center, blue fills from current value to 50%.
+          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc ${val}%, #4a90e2 ${val}%, #4a90e2 50%, #ccc 50%, #ccc 100%)`;
+        }
+      });
+      // Initialize the slider background.
+      slider.dispatchEvent(new Event('input'));
+    });
+
     document.getElementById('learning-style-form').addEventListener('submit', function(event) {
       event.preventDefault();
+      // Gather slider responses
+      const q1 = parseInt(document.querySelector('input[name="q1"]').value);
+      const q2 = parseInt(document.querySelector('input[name="q2"]').value);
+      const q3 = parseInt(document.querySelector('input[name="q3"]').value);
+      const q4 = parseInt(document.querySelector('input[name="q4"]').value);
+      const q5 = parseInt(document.querySelector('input[name="q5"]').value);
+      const q6 = parseInt(document.querySelector('input[name="q6"]').value);
+      const q7 = parseInt(document.querySelector('input[name="q7"]').value);
+      const q8 = parseInt(document.querySelector('input[name="q8"]').value);
+      const q9 = parseInt(document.querySelector('input[name="q9"]').value);
+      const q10 = parseInt(document.querySelector('input[name="q10"]').value);
+      const q11 = parseInt(document.querySelector('input[name="q11"]').value);
+      const q12 = parseInt(document.querySelector('input[name="q12"]').value);
+      const q13 = parseInt(document.querySelector('input[name="q13"]').value);
+      const q14 = parseInt(document.querySelector('input[name="q14"]').value);
+      const q15 = parseInt(document.querySelector('input[name="q15"]').value);
+      const q16 = parseInt(document.querySelector('input[name="q16"]').value);
+      const q17 = parseInt(document.querySelector('input[name="q17"]').value);
+      const q18 = parseInt(document.querySelector('input[name="q18"]').value);
+      const q19 = parseInt(document.querySelector('input[name="q19"]').value);
+      const q20 = parseInt(document.querySelector('input[name="q20"]').value);
       
-      // Gather the responses and convert them to numbers
-      const q1 = parseInt(document.querySelector('input[name="q1"]:checked').value);
-      const q2 = parseInt(document.querySelector('input[name="q2"]:checked').value);
-      const q3 = parseInt(document.querySelector('input[name="q3"]:checked').value);
-      const q4 = parseInt(document.querySelector('input[name="q4"]:checked').value);
-      const q5 = parseInt(document.querySelector('input[name="q5"]:checked').value);
-      const q6 = parseInt(document.querySelector('input[name="q6"]:checked').value);
-      const q7 = parseInt(document.querySelector('input[name="q7"]:checked').value);
-      const q8 = parseInt(document.querySelector('input[name="q8"]:checked').value);
-      const q9 = parseInt(document.querySelector('input[name="q9"]:checked').value);
-      const q10 = parseInt(document.querySelector('input[name="q10"]:checked').value);
-      const q11 = parseInt(document.querySelector('input[name="q11"]:checked').value);
-      const q12 = parseInt(document.querySelector('input[name="q12"]:checked').value);
-      const q13 = parseInt(document.querySelector('input[name="q13"]:checked').value);
-      const q14 = parseInt(document.querySelector('input[name="q14"]:checked').value);
-      const q15 = parseInt(document.querySelector('input[name="q15"]:checked').value);
-      const q16 = parseInt(document.querySelector('input[name="q16"]:checked').value);
-      const q17 = parseInt(document.querySelector('input[name="q17"]:checked').value);
-      const q18 = parseInt(document.querySelector('input[name="q18"]:checked').value);
-      const q19 = parseInt(document.querySelector('input[name="q19"]:checked').value);
-      const q20 = parseInt(document.querySelector('input[name="q20"]:checked').value);
+      // Invert scores: lower slider value (closer to Agree) gives higher points.
+      const kinesthetic = (101 - q1) + (101 - q5) + (101 - q9) + (101 - q13) + (101 - q17);
+      const auditory = (101 - q2) + (101 - q6) + (101 - q10) + (101 - q14) + (101 - q18);
+      const visual = (101 - q3) + (101 - q7) + (101 - q11) + (101 - q15) + (101 - q19);
+      const readingWriting = (101 - q4) + (101 - q8) + (101 - q12) + (101 - q16) + (101 - q20);
       
-      // Invert the scores so that a lower raw answer (stronger agreement) yields a higher score.
-      // Score = (6 - answer)
-      const kinesthetic = (6 - q1) + (6 - q5) + (6 - q9) + (6 - q13) + (6 - q17);
-      const auditory = (6 - q2) + (6 - q6) + (6 - q10) + (6 - q14) + (6 - q18);
-      const visual = (6 - q3) + (6 - q7) + (6 - q11) + (6 - q15) + (6 - q19);
-      const readingWriting = (6 - q4) + (6 - q8) + (6 - q12) + (6 - q16) + (6 - q20);
-      
-      // Determine the learning style with the highest score.
+      // Determine which category has the highest score.
       const maxScore = Math.max(kinesthetic, auditory, visual, readingWriting);
       let learnerType = "";
       
-      // In case of ties, this simple logic will return the first matching style.
-      if(maxScore === kinesthetic) {
+      if (maxScore === kinesthetic) {
         learnerType = "Kinesthetic";
-      } else if(maxScore === auditory) {
+      } else if (maxScore === auditory) {
         learnerType = "Auditory";
-      } else if(maxScore === visual) {
+      } else if (maxScore === visual) {
         learnerType = "Visual";
-      } else if(maxScore === readingWriting) {
+      } else if (maxScore === readingWriting) {
         learnerType = "Reading/Writing";
       }
       
-       // Display the result in the modal
       document.getElementById("result-text").innerText = "Your preferred learning style is: " + learnerType;
       document.getElementById("result-modal").style.display = "flex";
     });
     
-    // Function to close the result modal
     function closeResultModal() {
       document.getElementById("result-modal").style.display = "none";
     }
     
-    // Optional: close modal when clicking outside of it
     window.onclick = function(event) {
       const modal = document.getElementById("result-modal");
       if (event.target === modal) {
