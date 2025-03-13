@@ -22,7 +22,9 @@ def chatbot_page():
 @app.route('/learning_style')
 def learning_style():
     return render_template('learning_styles.html')
-
+@app.route('/schedule')
+def schedule():
+    return render_template('schedule.html')
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get('message', '')

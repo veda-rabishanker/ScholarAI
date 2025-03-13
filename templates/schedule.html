@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plan Your Week | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <style>
+body {
+  font-family: 'Merriweather', serif;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+}
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+/* Header Styles */
+header {
+  background: #1b2a4e;
+  color: #ffffff;
+  padding: 25px 0;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+}
+nav ul li {
+  margin: 0 15px;
+}
+nav ul li a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+nav ul li a:hover {
+  color: #b0bec5;
+}
+    /* Busy-Time Input Section */
+    #busy-time-section {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    #week-container {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .day-box {
+      flex: 1 1 calc(14% - 10px);
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      min-width: 120px;
+      background-color: #fafafa;
+      position: relative;
+    }
+    .day-box h3 {
+      margin-top: 0;
+      text-align: center;
+      background-color: #007bff;
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
+    }
+    .busy-times {
+      margin-top: 10px;
+    }
+    .busy-input {
+      width: 90%;
+      padding: 5px;
+      margin: 5px auto;
+      display: block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .add-input-btn {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 24px;
+      margin: 0 auto;
+      display: block;
+    }
+    #plan-week-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #plan-week-btn:hover {
+      background-color: #0056b3;
+    }
+    /* Calendar Section */
+    #calendar-section {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: opacity 0.5s ease, max-height 0.5s ease;
+    }
+    #calendar-section.show {
+      opacity: 1;
+      max-height: 2000px; /* Adjust as needed */
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      margin-top: 20px;
+    }
+    .calendar .day {
+      border: 1px solid #ccc;
+      padding: 10px;
+      min-height: 80px;
+      text-align: center;
+      position: relative;
+    }
+    .calendar .header {
+      font-weight: bold;
+      background-color: #f0f0f0;
+    }
+    .busy-time-event {
+      background-color: #d9534f;
+      color: white;
+      padding: 2px;
+      margin-top: 5px;
+      font-size: 0.8em;
+      border-radius: 3px;
+    }
+    /* Responsive: Stack day boxes on small screens */
+    @media (max-width: 600px) {
+      .day-box {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Plan Your Week</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/learning_style">Learning Style</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Busy-Time Input Section (stays on top) -->
+    <section id="busy-time-section">
+      <h2>When You Can't Study</h2>
+      <p>Enter the times you’re unavailable. Use the plus button to add more entries for a day.</p>
+      <div id="week-container">
+        <!-- One box per day of the week (0=Sun, 1=Mon, etc.) -->
+        <div class="day-box" data-day="0">
+          <h3>Sun</h3>
+          <div class="busy-times">
+            <!-- Default empty input; will be replaced if data exists -->
+            <input type="text" class="busy-input" placeholder="e.g., 1-2 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="1">
+          <h3>Mon</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 9-10 AM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="2">
+          <h3>Tue</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 2-3 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="3">
+          <h3>Wed</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 12-1 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="4">
+          <h3>Thu</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 3-4 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="5">
+          <h3>Fri</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 1-2 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="6">
+          <h3>Sat</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 10-11 AM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+      </div>
+      <button id="plan-week-btn">OK</button>
+    </section>
+
+    <!-- Calendar Section (appears below when ready) -->
+    <section id="calendar-section">
+      <h2 id="calendar-month-heading">Calendar</h2>
+      <div id="calendar" class="calendar">
+        <!-- Calendar headers -->
+        <div class="header">Sun</div>
+        <div class="header">Mon</div>
+        <div class="header">Tue</div>
+        <div class="header">Wed</div>
+        <div class="header">Thu</div>
+        <div class="header">Fri</div>
+        <div class="header">Sat</div>
+        <!-- Day cells will be generated here -->
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+      // --- Helper Functions ---
+
+      // Attach plus-button listeners to add extra busy-time inputs.
+      document.querySelectorAll(".add-input-btn").forEach(button => {
+        button.addEventListener("click", function() {
+          const dayBox = button.parentElement;
+          const busyTimesContainer = dayBox.querySelector(".busy-times");
+          const newInput = document.createElement("input");
+          newInput.type = "text";
+          newInput.classList.add("busy-input");
+          newInput.placeholder = "e.g., 1-2 PM";
+          busyTimesContainer.appendChild(newInput);
+        });
+      });
+
+      // Generate the calendar grid for the given month and year.
+      function generateCalendar(month, year) {
+        const calendarDiv = document.getElementById("calendar");
+        // Remove any previously generated day cells (keep the first 7 header cells)
+        while (calendarDiv.children.length > 7) {
+          calendarDiv.removeChild(calendarDiv.lastChild);
+        }
+        const firstDay = new Date(year, month, 1).getDay(); // 0=Sun, etc.
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Add empty cells for days before the month starts.
+        for (let i = 0; i < firstDay; i++) {
+          const emptyCell = document.createElement("div");
+          emptyCell.classList.add("day");
+          calendarDiv.appendChild(emptyCell);
+        }
+        // Create a cell for each day with a data-weekday attribute.
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dayCell = document.createElement("div");
+          dayCell.classList.add("day");
+          dayCell.setAttribute("data-day", day);
+          const dayOfWeek = (firstDay + (day - 1)) % 7;
+          dayCell.setAttribute("data-weekday", dayOfWeek);
+          dayCell.innerHTML = `<strong>${day}</strong>`;
+          calendarDiv.appendChild(dayCell);
+        }
+      }
+
+      // Update the calendar cells with busy times for each weekday.
+      function updateCalendar(weekData) {
+        const dayCells = document.querySelectorAll("#calendar .day");
+        dayCells.forEach(cell => {
+          if (cell.hasAttribute("data-day")) {
+            const weekday = cell.getAttribute("data-weekday");
+            const busyTimes = weekData[weekday];
+            if (busyTimes && busyTimes.length > 0) {
+              busyTimes.forEach(time => {
+                const busyDiv = document.createElement("div");
+                busyDiv.classList.add("busy-time-event");
+                busyDiv.innerText = time;
+                cell.appendChild(busyDiv);
+              });
+              cell.classList.add("busy");
+            }
+          }
+        });
+      }
+
+      // --- Persistence: Load stored busy times (if any) ---
+      function loadStoredData() {
+        const stored = localStorage.getItem("busyWeekData");
+        if (stored) {
+          return JSON.parse(stored);
+        }
+        return null;
+      }
+
+      // Populate busy-time inputs from stored data.
+      function populateBusyInputs(storedData) {
+        if (!storedData) return;
+        document.querySelectorAll(".day-box").forEach(dayBox => {
+          const day = dayBox.getAttribute("data-day");
+          const busyTimes = storedData[day] || [];
+          const busyContainer = dayBox.querySelector(".busy-times");
+          busyContainer.innerHTML = ""; // clear existing inputs
+          if (busyTimes.length > 0) {
+            busyTimes.forEach(time => {
+              const input = document.createElement("input");
+              input.type = "text";
+              input.classList.add("busy-input");
+              input.placeholder = "e.g., 1-2 PM";
+              input.value = time;
+              busyContainer.appendChild(input);
+            });
+          } else {
+            // If no data for this day, show one empty input.
+            const input = document.createElement("input");
+            input.type = "text";
+            input.classList.add("busy-input");
+            input.placeholder = "e.g., 1-2 PM";
+            busyContainer.appendChild(input);
+          }
+        });
+      }
+
+      // --- Main Execution on Page Load ---
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June", 
+        "July", "August", "September", "October", "November", "December"
+      ];
+      document.getElementById("calendar-month-heading").innerText = monthNames[currentMonth] + " " + currentYear;
+
+      // If stored busy times exist, populate the inputs and display the calendar.
+      const storedWeekData = loadStoredData();
+      if (storedWeekData) {
+        populateBusyInputs(storedWeekData);
+        generateCalendar(currentMonth, currentYear);
+        updateCalendar(storedWeekData);
+        document.getElementById("calendar-section").style.display = "block";
+        setTimeout(() => {
+          document.getElementById("calendar-section").classList.add("show");
+        }, 10);
+      }
+
+      // --- Handle "Plan Week" Button Click ---
+      document.getElementById("plan-week-btn").addEventListener("click", function(e) {
+        e.preventDefault();
+
+        // Gather busy times from each day-box.
+        const weekData = {};
+        document.querySelectorAll(".day-box").forEach(dayBox => {
+          const day = dayBox.getAttribute("data-day");
+          const inputs = dayBox.querySelectorAll(".busy-input");
+          weekData[day] = [];
+          inputs.forEach(input => {
+            if (input.value.trim() !== "") {
+              weekData[day].push(input.value.trim());
+            }
+          });
+        });
+
+        // Store the data in localStorage.
+        localStorage.setItem("busyWeekData", JSON.stringify(weekData));
+
+        // Generate and update the calendar.
+        generateCalendar(currentMonth, currentYear);
+        updateCalendar(weekData);
+
+        // Reveal the calendar section (if not already visible).
+        const calendarSection = document.getElementById("calendar-section");
+        calendarSection.style.display = "block";
+        setTimeout(() => {
+          calendarSection.classList.add("show");
+        }, 10);
+      });
+    });
+  </script>
+</body>
+</html>
