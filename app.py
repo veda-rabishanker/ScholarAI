@@ -3,6 +3,7 @@ from flask_session import Session
 import openai
 import os
 app = Flask(__name__)
+#test change
 # Session configuration
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
