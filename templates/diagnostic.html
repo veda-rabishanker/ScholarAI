@@ -23,24 +23,73 @@
   </header>
 
   <main class="chat-container container">
-    <!-- Diagnostic Test Form (always visible) -->
+    <!-- Section for generating the diagnostic test -->
     <div id="diagnostic-test-section">
       <h2>Generate a Diagnostic Test</h2>
       <form id="generate-test-form">
-        <label for="subject">Subject:</label> 
+        <label for="subject">Subject:</label>
         <input type="text" id="subject" placeholder="Enter subject (e.g., Mathematics)" required>
-    
+
         <label for="grade-level">Grade Level:</label>
         <input type="text" id="grade-level" placeholder="Enter grade level (e.g., 7)" required>
-    
+
         <label for="topic">Topic:</label>
         <input type="text" id="topic" placeholder="Enter topic (e.g., Algebra)" required>
-    
+
         <button type="submit">Generate Test</button>
       </form>
-    
-      <!-- Display generated test here -->
+
+      <!-- Container to display generated test -->
       <div id="test-output" class="test-box" aria-live="polite"></div>
+
+      <!-- Answers Form (hidden until a test is generated) -->
+      <form id="answers-form" style="display:none; margin-top: 20px;">
+        <h3>Enter Your Answers</h3>
+        <p>Type your answers for each of the 10 questions. For multiple-choice, enter A, B, C, or D. For free-response, type your best short answer.</p>
+        <ol>
+          <li>
+            <label>Answer 1:</label>
+            <input type="text" name="answer1" required>
+          </li>
+          <li>
+            <label>Answer 2:</label>
+            <input type="text" name="answer2" required>
+          </li>
+          <li>
+            <label>Answer 3:</label>
+            <input type="text" name="answer3" required>
+          </li>
+          <li>
+            <label>Answer 4:</label>
+            <input type="text" name="answer4" required>
+          </li>
+          <li>
+            <label>Answer 5:</label>
+            <input type="text" name="answer5" required>
+          </li>
+          <li>
+            <label>Answer 6:</label>
+            <input type="text" name="answer6" required>
+          </li>
+          <li>
+            <label>Answer 7:</label>
+            <input type="text" name="answer7" required>
+          </li>
+          <li>
+            <label>Answer 8:</label>
+            <input type="text" name="answer8" required>
+          </li>
+          <li>
+            <label>Answer 9:</label>
+            <input type="text" name="answer9" required>
+          </li>
+          <li>
+            <label>Answer 10:</label>
+            <input type="text" name="answer10" required>
+          </li>
+        </ol>
+        <button type="submit">Submit Answers</button>
+      </form>
     </div>
   </main>
 
@@ -50,26 +99,42 @@
     </div>
   </footer>
 
+  <!-- You can still include chat.js if needed; it doesn't conflict -->
   <script src="{{ url_for('static', filename='chat.js') }}"></script>
+
   <script>
-    // Existing form submission logic remains unchanged
     document.addEventListener("DOMContentLoaded", function() {
-      document.getElementById('generate-test-form').addEventListener('submit', function(event) {
+      // 1) Generate Test
+      const generateForm = document.getElementById('generate-test-form');
+      const testOutput = document.getElementById('test-output');
+      const answersForm = document.getElementById('answers-form');
+
+      generateForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        const subject = document.getElementById('subject').value;
-        const gradeLevel = document.getElementById('grade-level').value;
-        const topic = document.getElementById('topic').value;
-    
+
+        const subject = document.getElementById('subject').value.trim();
+        const gradeLevel = document.getElementById('grade-level').value.trim();
+        const topic = document.getElementById('topic').value.trim();
+
         fetch('/generate_test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subject: subject, grade_level: gradeLevel, topic: topic })
+          body: JSON.stringify({
+            subject: subject,
+            grade_level: gradeLevel,
+            topic: topic
+          })
         })
         .then(response => response.json())
         .then(data => {
-          const testOutput = document.getElementById('test-output');
           if (data.diagnostic_test) {
-            testOutput.innerHTML = `<h3>Generated Diagnostic Test:</h3><p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>`;
+            // Display the generated test
+            testOutput.innerHTML = `
+              <h3>Generated Diagnostic Test:</h3>
+              <p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>
+            `;
+            // Show the answers form
+            answersForm.style.display = 'block';
           } else if (data.error) {
             alert(data.error);
           }
@@ -77,6 +142,36 @@
         .catch(error => {
           console.error('Error generating test:', error);
           alert('An error occurred while generating the test.');
+        });
+      });
+
+      // 2) Submit Answers
+      answersForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Gather answers from form
+        const formData = new FormData(answersForm);
+        const answers = {};
+        for (let [key, value] of formData.entries()) {
+          answers[key] = value;
+        }
+
+        fetch('/submit_test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(answers)
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            alert('Your answers have been submitted successfully!');
+          } else {
+            alert('There was an error submitting your answers.');
+          }
+        })
+        .catch(err => {
+          console.error('Error submitting answers:', err);
+          alert('An error occurred while submitting your answers.');
         });
       });
     });

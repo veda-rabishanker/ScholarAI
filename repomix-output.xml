@@ -1,0 +1,1859 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+static/
+  chat.css
+  chat.js
+  script.js
+  styles.css
+templates/
+  chatbot.html
+  diagnostic.html
+  index.html
+  learning_styles.html
+  schedule.html
+topic_prompts/
+  diagnostic_test.txt
+  initial_prompt.txt
+.gitignore
+app.py
+c2cbot.code-workspace
+diagnostic_test.txt
+pyproject.toml
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="static/chat.js">
+document.addEventListener('DOMContentLoaded', () => {
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+  const chatBox = document.getElementById('chat-box');
+
+  chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      appendMessage('You', message);
+      chatInput.value = '';
+
+      try {
+          const response = await fetch('/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: message, subject: "General" })
+          });
+
+          const data = await response.json();
+          appendMessage('AI', data.response || "Error: No response from AI.");
+      } catch (error) {
+          appendMessage('AI', 'Error: Could not reach server.');
+      }
+  });
+
+  function appendMessage(sender, text) {
+      const messageElement = document.createElement('div');
+      messageElement.textContent = `${sender}: ${text}`;
+      chatBox.appendChild(messageElement);
+      chatBox.scrollTop = chatBox.scrollHeight;
+  }
+});
+</file>
+
+<file path="static/script.js">
+// Wait for the document to load
+document.addEventListener('DOMContentLoaded', () => {
+    const signInForm = document.getElementById('sign-in-form');
+    const signUpForm = document.getElementById('sign-up-form');
+  
+    if (signInForm) {
+      signInForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        // Implement sign-in functionality here
+        alert('Sign In functionality is not implemented.');
+      });
+    }
+  
+    if (signUpForm) {
+      signUpForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        // Implement sign-up functionality here
+        alert('Sign Up functionality is not implemented.');
+      });
+    }
+  });
+  
+  // Function to toggle modals
+  function toggleModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    if (modal.style.display === "flex") {
+      modal.style.display = "none";
+    } else {
+      modal.style.display = "flex";
+    }
+  }
+  
+  // Close modal if clicking outside the modal content
+  window.onclick = function (event) {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach((modal) => {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    });
+  };
+</file>
+
+<file path="templates/schedule.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plan Your Week | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <style>
+body {
+  font-family: 'Merriweather', serif;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+}
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+/* Header Styles */
+header {
+  background: #1b2a4e;
+  color: #ffffff;
+  padding: 25px 0;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+}
+nav ul li {
+  margin: 0 15px;
+}
+nav ul li a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+nav ul li a:hover {
+  color: #b0bec5;
+}
+    /* Busy-Time Input Section */
+    #busy-time-section {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    #week-container {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .day-box {
+      flex: 1 1 calc(14% - 10px);
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      min-width: 120px;
+      background-color: #fafafa;
+      position: relative;
+    }
+    .day-box h3 {
+      margin-top: 0;
+      text-align: center;
+      background-color: #007bff;
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
+    }
+    .busy-times {
+      margin-top: 10px;
+    }
+    .busy-input {
+      width: 90%;
+      padding: 5px;
+      margin: 5px auto;
+      display: block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .add-input-btn {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 24px;
+      margin: 0 auto;
+      display: block;
+    }
+    #plan-week-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #plan-week-btn:hover {
+      background-color: #0056b3;
+    }
+    /* Calendar Section */
+    #calendar-section {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: opacity 0.5s ease, max-height 0.5s ease;
+    }
+    #calendar-section.show {
+      opacity: 1;
+      max-height: 2000px; /* Adjust as needed */
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      margin-top: 20px;
+    }
+    .calendar .day {
+      border: 1px solid #ccc;
+      padding: 10px;
+      min-height: 80px;
+      text-align: center;
+      position: relative;
+    }
+    .calendar .header {
+      font-weight: bold;
+      background-color: #f0f0f0;
+    }
+    .busy-time-event {
+      background-color: #d9534f;
+      color: white;
+      padding: 2px;
+      margin-top: 5px;
+      font-size: 0.8em;
+      border-radius: 3px;
+    }
+    /* Responsive: Stack day boxes on small screens */
+    @media (max-width: 600px) {
+      .day-box {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Plan Your Week</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/learning_style">Learning Style</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Busy-Time Input Section (stays on top) -->
+    <section id="busy-time-section">
+      <h2>When You Can't Study</h2>
+      <p>Enter the times you’re unavailable. Use the plus button to add more entries for a day.</p>
+      <div id="week-container">
+        <!-- One box per day of the week (0=Sun, 1=Mon, etc.) -->
+        <div class="day-box" data-day="0">
+          <h3>Sun</h3>
+          <div class="busy-times">
+            <!-- Default empty input; will be replaced if data exists -->
+            <input type="text" class="busy-input" placeholder="e.g., 1-2 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="1">
+          <h3>Mon</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 9-10 AM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="2">
+          <h3>Tue</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 2-3 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="3">
+          <h3>Wed</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 12-1 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="4">
+          <h3>Thu</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 3-4 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="5">
+          <h3>Fri</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 1-2 PM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+        <div class="day-box" data-day="6">
+          <h3>Sat</h3>
+          <div class="busy-times">
+            <input type="text" class="busy-input" placeholder="e.g., 10-11 AM">
+          </div>
+          <button class="add-input-btn" title="Add more busy times">+</button>
+        </div>
+      </div>
+      <button id="plan-week-btn">OK</button>
+    </section>
+
+    <!-- Calendar Section (appears below when ready) -->
+    <section id="calendar-section">
+      <h2 id="calendar-month-heading">Calendar</h2>
+      <div id="calendar" class="calendar">
+        <!-- Calendar headers -->
+        <div class="header">Sun</div>
+        <div class="header">Mon</div>
+        <div class="header">Tue</div>
+        <div class="header">Wed</div>
+        <div class="header">Thu</div>
+        <div class="header">Fri</div>
+        <div class="header">Sat</div>
+        <!-- Day cells will be generated here -->
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+      // --- Helper Functions ---
+
+      // Attach plus-button listeners to add extra busy-time inputs.
+      document.querySelectorAll(".add-input-btn").forEach(button => {
+        button.addEventListener("click", function() {
+          const dayBox = button.parentElement;
+          const busyTimesContainer = dayBox.querySelector(".busy-times");
+          const newInput = document.createElement("input");
+          newInput.type = "text";
+          newInput.classList.add("busy-input");
+          newInput.placeholder = "e.g., 1-2 PM";
+          busyTimesContainer.appendChild(newInput);
+        });
+      });
+
+      // Generate the calendar grid for the given month and year.
+      function generateCalendar(month, year) {
+        const calendarDiv = document.getElementById("calendar");
+        // Remove any previously generated day cells (keep the first 7 header cells)
+        while (calendarDiv.children.length > 7) {
+          calendarDiv.removeChild(calendarDiv.lastChild);
+        }
+        const firstDay = new Date(year, month, 1).getDay(); // 0=Sun, etc.
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Add empty cells for days before the month starts.
+        for (let i = 0; i < firstDay; i++) {
+          const emptyCell = document.createElement("div");
+          emptyCell.classList.add("day");
+          calendarDiv.appendChild(emptyCell);
+        }
+        // Create a cell for each day with a data-weekday attribute.
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dayCell = document.createElement("div");
+          dayCell.classList.add("day");
+          dayCell.setAttribute("data-day", day);
+          const dayOfWeek = (firstDay + (day - 1)) % 7;
+          dayCell.setAttribute("data-weekday", dayOfWeek);
+          dayCell.innerHTML = `<strong>${day}</strong>`;
+          calendarDiv.appendChild(dayCell);
+        }
+      }
+
+      // Update the calendar cells with busy times for each weekday.
+      function updateCalendar(weekData) {
+        const dayCells = document.querySelectorAll("#calendar .day");
+        dayCells.forEach(cell => {
+          if (cell.hasAttribute("data-day")) {
+            const weekday = cell.getAttribute("data-weekday");
+            const busyTimes = weekData[weekday];
+            if (busyTimes && busyTimes.length > 0) {
+              busyTimes.forEach(time => {
+                const busyDiv = document.createElement("div");
+                busyDiv.classList.add("busy-time-event");
+                busyDiv.innerText = time;
+                cell.appendChild(busyDiv);
+              });
+              cell.classList.add("busy");
+            }
+          }
+        });
+      }
+
+      // --- Persistence: Load stored busy times (if any) ---
+      function loadStoredData() {
+        const stored = localStorage.getItem("busyWeekData");
+        if (stored) {
+          return JSON.parse(stored);
+        }
+        return null;
+      }
+
+      // Populate busy-time inputs from stored data.
+      function populateBusyInputs(storedData) {
+        if (!storedData) return;
+        document.querySelectorAll(".day-box").forEach(dayBox => {
+          const day = dayBox.getAttribute("data-day");
+          const busyTimes = storedData[day] || [];
+          const busyContainer = dayBox.querySelector(".busy-times");
+          busyContainer.innerHTML = ""; // clear existing inputs
+          if (busyTimes.length > 0) {
+            busyTimes.forEach(time => {
+              const input = document.createElement("input");
+              input.type = "text";
+              input.classList.add("busy-input");
+              input.placeholder = "e.g., 1-2 PM";
+              input.value = time;
+              busyContainer.appendChild(input);
+            });
+          } else {
+            // If no data for this day, show one empty input.
+            const input = document.createElement("input");
+            input.type = "text";
+            input.classList.add("busy-input");
+            input.placeholder = "e.g., 1-2 PM";
+            busyContainer.appendChild(input);
+          }
+        });
+      }
+
+      // --- Main Execution on Page Load ---
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June", 
+        "July", "August", "September", "October", "November", "December"
+      ];
+      document.getElementById("calendar-month-heading").innerText = monthNames[currentMonth] + " " + currentYear;
+
+      // If stored busy times exist, populate the inputs and display the calendar.
+      const storedWeekData = loadStoredData();
+      if (storedWeekData) {
+        populateBusyInputs(storedWeekData);
+        generateCalendar(currentMonth, currentYear);
+        updateCalendar(storedWeekData);
+        document.getElementById("calendar-section").style.display = "block";
+        setTimeout(() => {
+          document.getElementById("calendar-section").classList.add("show");
+        }, 10);
+      }
+
+      // --- Handle "Plan Week" Button Click ---
+      document.getElementById("plan-week-btn").addEventListener("click", function(e) {
+        e.preventDefault();
+
+        // Gather busy times from each day-box.
+        const weekData = {};
+        document.querySelectorAll(".day-box").forEach(dayBox => {
+          const day = dayBox.getAttribute("data-day");
+          const inputs = dayBox.querySelectorAll(".busy-input");
+          weekData[day] = [];
+          inputs.forEach(input => {
+            if (input.value.trim() !== "") {
+              weekData[day].push(input.value.trim());
+            }
+          });
+        });
+
+        // Store the data in localStorage.
+        localStorage.setItem("busyWeekData", JSON.stringify(weekData));
+
+        // Generate and update the calendar.
+        generateCalendar(currentMonth, currentYear);
+        updateCalendar(weekData);
+
+        // Reveal the calendar section (if not already visible).
+        const calendarSection = document.getElementById("calendar-section");
+        calendarSection.style.display = "block";
+        setTimeout(() => {
+          calendarSection.classList.add("show");
+        }, 10);
+      });
+    });
+  </script>
+</body>
+</html>
+</file>
+
+<file path="topic_prompts/diagnostic_test.txt">
+Your job is only to make 10 diagnostic questions based on the subject and grade level put in by the user.
+</file>
+
+<file path=".gitignore">
+.qodo
+</file>
+
+<file path="c2cbot.code-workspace">
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
+</file>
+
+<file path="diagnostic_test.txt">
+Directive for ChatBot:
+You are tasked with creating a 10 question diagnostic test for a student to see how well they know the specific subject they choose. These questions will be number 1-10 with variance in each question providing either a free response question or a multiple choice question that has 4 answer choices. Each question should be separated by a line break and a dashed line. Your purpose is to create different questions to see what the student knows and what the student doesn’t.
+</file>
+
+<file path="pyproject.toml">
+[tool.poetry]
+name = "python-template"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10.0,<3.11"
+flask = "^3.0.0"
+gunicorn = "^21.2.0"
+flask-session = "^0.8.0"
+openai = "^1.16.1"
+
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+useLibraryCodeForTypes = true
+exclude = [".cache"]
+
+[tool.ruff]
+# https://beta.ruff.rs/docs/configuration/
+select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
+ignore = ['W291', 'W292', 'W293']
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+</file>
+
+<file path="README.md">
+# ScholarAI
+</file>
+
+<file path="static/chat.css">
+/* Chat Container */
+.chat-container {
+  background: #f2f2f2;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Chat Log */
+.chat-log {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #dcdcdc;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+/* Chat Message */
+.chat-message {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Chat Form */
+.chat-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Chat Input */
+#chat-input {
+  flex: 3;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  min-height: 50px;
+  resize: none;
+  background: #f5f5f5;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Send Button */
+.send-button {
+  padding: 12px 24px;
+  border: none;
+  background: #4a90e2;
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
+}
+
+.send-button:hover {
+  background: #357ab7;
+}
+
+/* Chat History */
+.chat-history {
+  background: #ffffff;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Chat Instructions */
+.chat-instructions {
+  background: #e6e6e6;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chat-instructions h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .chat-form {
+      flex-direction: column;
+  }
+
+  #chat-input {
+      width: 100%;
+      border-radius: 8px;
+  }
+
+  .send-button {
+      width: 100%;
+      border-radius: 8px;
+  }
+}
+</file>
+
+<file path="static/styles.css">
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Merriweather', serif;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+}
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+/* Header Styles */
+header {
+  background: #1b2a4e;
+  color: #ffffff;
+  padding: 25px 0;
+}
+header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 {
+  font-family: 'Playfair Display', serif;
+  margin: 0;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+}
+nav ul li {
+  margin: 0 15px;
+}
+nav ul li a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+nav ul li a:hover {
+  color: #b0bec5;
+}
+/* Hero Section */
+.hero {
+  background: url('https://summer.harvard.edu/wp-content/uploads/sites/7/2022/06/how-to-study-like-a-harvard-student.jpg') no-repeat center center/cover;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #ffffff;
+  position: relative;
+  background-position: center;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(27, 42, 78, 0.7);
+  z-index: 1;
+}
+.hero .container {
+  position: relative;
+  z-index: 2;
+}
+.hero h2 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  font-family: 'Playfair Display', serif;
+}
+.hero p {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+.hero-buttons button {
+  background: #546e7a;
+  border: none;
+  color: #fff;
+  padding: 10px 20px;
+  margin: 0 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+}
+.hero-buttons button:hover {
+  background: #37474f;
+}
+/* Features Section */
+.features {
+  padding: 40px 0;
+  background: #ffffff;
+  text-align: center;
+}
+.features h2 {
+  margin-bottom: 20px;
+  font-family: 'Playfair Display', serif;
+}
+.feature {
+  background: #eceff1;
+  padding: 20px;
+  margin: 20px;
+  display: inline-block;
+  width: 250px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+/* About & Contact Sections */
+.about, .contact {
+  padding: 40px 0;
+  background: #fff;
+  text-align: center;
+}
+.about p{
+  margin-bottom: 20px;
+}
+.about h2, .contact h2 {
+  margin-bottom: 20px;
+  font-family: 'Playfair Display', serif;
+}
+/* Footer */
+footer {
+  background: #1b2a4e;
+  color: #fff;
+  text-align: center;
+  padding: 10px 0;
+  margin-top: 20px;
+}
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  margin: auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 400px;
+  position: relative;
+  animation: fadeIn 0.3s;
+}
+.close {
+  position: absolute;
+  right: 15px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+/* Form Styles */
+form input[type="text"],
+form input[type="password"] {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+form button {
+  width: 100%;
+  background: #1b2a4e;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+form button:hover {
+  background: #102040;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+/* Links inside the dropdown */
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {background-color: #ddd;}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {display: block;}
+
+
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style the dropdown content */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* Show dropdown when hovering over the parent "Tests" button */
+.dropdown:hover .dropdown-content,
+.dropdown-content:hover {
+  display: block;
+}
+
+/* Ensure the dropdown container is positioned correctly */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style the dropdown content */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%; /* Make sure it's directly below the button */
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+/* Ensure no gap between the button and dropdown */
+.dropdown:hover .dropdown-content,
+.dropdown-content:hover {
+  display: block;
+}
+
+/* Optional: Add padding to prevent flickering */
+.dropdown-content {
+  padding: 5px 0;
+}
+</file>
+
+<file path="templates/diagnostic.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostic Test | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Diagnostic Test</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/learning_style">Learning Style</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="chat-container container">
+    <!-- Diagnostic Test Form (always visible) -->
+    <div id="diagnostic-test-section">
+      <h2>Generate a Diagnostic Test</h2>
+      <form id="generate-test-form">
+        <label for="subject">Subject:</label> 
+        <input type="text" id="subject" placeholder="Enter subject (e.g., Mathematics)" required>
+    
+        <label for="grade-level">Grade Level:</label>
+        <input type="text" id="grade-level" placeholder="Enter grade level (e.g., 7)" required>
+    
+        <label for="topic">Topic:</label>
+        <input type="text" id="topic" placeholder="Enter topic (e.g., Algebra)" required>
+    
+        <button type="submit">Generate Test</button>
+      </form>
+    
+      <!-- Display generated test here -->
+      <div id="test-output" class="test-box" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+  <script>
+    // Existing form submission logic remains unchanged
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById('generate-test-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const subject = document.getElementById('subject').value;
+        const gradeLevel = document.getElementById('grade-level').value;
+        const topic = document.getElementById('topic').value;
+    
+        fetch('/generate_test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: subject, grade_level: gradeLevel, topic: topic })
+        })
+        .then(response => response.json())
+        .then(data => {
+          const testOutput = document.getElementById('test-output');
+          if (data.diagnostic_test) {
+            testOutput.innerHTML = `<h3>Generated Diagnostic Test:</h3><p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>`;
+          } else if (data.error) {
+            alert(data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Error generating test:', error);
+          alert('An error occurred while generating the test.');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
+</file>
+
+<file path="templates/learning_styles.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learning Style Diagnostic Test | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <style>
+    /* Basic styling for the slider-based test */
+    ol li {
+      background-color: #e4e1e1;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      max-width: 500px;
+      margin-top: 10px;
+    }
+    .slider-label {
+      width: 60px;
+      font-weight: bold;
+    }
+    .slider {
+      flex: 1;
+      margin: 0 10px;
+      -webkit-appearance: none;
+      height: 10px;
+      border-radius: 5px;
+      background: #ccc;
+      outline: none;
+    }
+    /* Webkit Thumb */
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #295281;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    /* Styling for the result modal */
+    #result-modal {
+      display: none;
+      position: fixed;
+      z-index: 200;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    #result-modal .modal-content {
+      background: #fff;
+      margin: auto;
+      padding: 20px;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 400px;
+      position: relative;
+      animation: fadeIn 0.3s;
+      text-align: center;
+    }
+    #result-modal .close {
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Learning Style Diagnostic Test</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/diagnostic">Diagnostic Test</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section>
+      <h2>Instructions</h2>
+      <p>
+        For each statement below, adjust the slider to indicate your level of agreement.
+        The left end represents "Agree" and the right end "Disagree." The slider's midpoint is neutral.
+        Answer all 20 questions honestly to help determine your best learning style.
+      </p>
+    </section>
+
+    <form id="learning-style-form">
+      <ol>
+        <!-- Question 1 (Kinesthetic) -->
+        <li>
+          <p>I prefer hands-on learning activities to understand new concepts.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q1" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 2 (Visual) -->
+        <li>
+          <p>I learn best when I use diagrams, charts, or other visual aids.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q2" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 3 (Auditory) -->
+        <li>
+          <p>I remember things better when I hear them rather than when I read them.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q3" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 4 (Reading/Writing) -->
+        <li>
+          <p>I learn best when I take notes or write summaries of what I'm studying.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q4" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 5 (Kinesthetic) -->
+        <li>
+          <p>I enjoy learning through physical movement or role-playing activities.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q5" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 6 (Auditory) -->
+        <li>
+          <p>I learn best by listening to lectures or discussions.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q6" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 7 (Visual) -->
+        <li>
+          <p>I find it easier to understand complex concepts when I see them visually.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q7" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 8 (Reading/Writing) -->
+        <li>
+          <p>I find that writing summaries or lists helps me understand and remember information.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q8" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 9 (Kinesthetic) -->
+        <li>
+          <p>I often remember information better when I can touch or manipulate objects related to the subject.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q9" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 10 (Auditory) -->
+        <li>
+          <p>I prefer to discuss topics with others to understand them.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q10" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 11 (Visual) -->
+        <li>
+          <p>I often use visual aids such as images or videos to support my learning.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q11" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 12 (Reading/Writing) -->
+        <li>
+          <p>I often use written instructions or textbooks to study new topics.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q12" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 13 (Kinesthetic) -->
+        <li>
+          <p>I find it easier to understand instructions if I can perform the task immediately.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q13" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 14 (Auditory) -->
+        <li>
+          <p>I often use my voice to help memorize and process information.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q14" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 15 (Visual) -->
+        <li>
+          <p>I prefer reading materials that include pictures or infographics.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q15" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 16 (Reading/Writing) -->
+        <li>
+          <p>I enjoy taking detailed notes and rewriting them to reinforce my learning.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q16" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 17 (Kinesthetic) -->
+        <li>
+          <p>I enjoy learning through physical activities and interactive experiences.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q17" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 18 (Auditory) -->
+        <li>
+          <p>I find that listening to audio recordings aids my learning.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q18" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 19 (Visual) -->
+        <li>
+          <p>I recall information better when I see it in written or drawn form.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q19" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+        <!-- Question 20 (Reading/Writing) -->
+        <li>
+          <p>I enjoy writing out detailed explanations to help myself understand a topic better.</p>
+          <div class="slider-container">
+            <span class="slider-label">Agree</span>
+            <input type="range" name="q20" class="slider" min="1" max="100" value="50" required>
+            <span class="slider-label">Disagree</span>
+          </div>
+        </li>
+      </ol>
+      <button type="submit">Submit Test</button>
+    </form>
+  </main>
+
+  <!-- Result Modal -->
+  <div id="result-modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeResultModal()">&times;</span>
+      <h2>Your Preferred Learning Style</h2>
+      <p id="result-text"></p>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Update each slider's background so blue fills from the center.
+    const sliders = document.querySelectorAll('.slider');
+    sliders.forEach(slider => {
+      slider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        if (val >= 50) {
+          // For values above center, blue fills from 50% to current value.
+          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc 50%, #4a90e2 50%, #4a90e2 ${val}%, #ccc ${val}%, #ccc 100%)`;
+        } else {
+          // For values below center, blue fills from current value to 50%.
+          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc ${val}%, #4a90e2 ${val}%, #4a90e2 50%, #ccc 50%, #ccc 100%)`;
+        }
+      });
+      // Initialize the slider background.
+      slider.dispatchEvent(new Event('input'));
+    });
+
+    document.getElementById('learning-style-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      // Gather slider responses
+      const q1 = parseInt(document.querySelector('input[name="q1"]').value);
+      const q2 = parseInt(document.querySelector('input[name="q2"]').value);
+      const q3 = parseInt(document.querySelector('input[name="q3"]').value);
+      const q4 = parseInt(document.querySelector('input[name="q4"]').value);
+      const q5 = parseInt(document.querySelector('input[name="q5"]').value);
+      const q6 = parseInt(document.querySelector('input[name="q6"]').value);
+      const q7 = parseInt(document.querySelector('input[name="q7"]').value);
+      const q8 = parseInt(document.querySelector('input[name="q8"]').value);
+      const q9 = parseInt(document.querySelector('input[name="q9"]').value);
+      const q10 = parseInt(document.querySelector('input[name="q10"]').value);
+      const q11 = parseInt(document.querySelector('input[name="q11"]').value);
+      const q12 = parseInt(document.querySelector('input[name="q12"]').value);
+      const q13 = parseInt(document.querySelector('input[name="q13"]').value);
+      const q14 = parseInt(document.querySelector('input[name="q14"]').value);
+      const q15 = parseInt(document.querySelector('input[name="q15"]').value);
+      const q16 = parseInt(document.querySelector('input[name="q16"]').value);
+      const q17 = parseInt(document.querySelector('input[name="q17"]').value);
+      const q18 = parseInt(document.querySelector('input[name="q18"]').value);
+      const q19 = parseInt(document.querySelector('input[name="q19"]').value);
+      const q20 = parseInt(document.querySelector('input[name="q20"]').value);
+      
+      // Invert scores: lower slider value (closer to Agree) gives higher points.
+      const kinesthetic = (101 - q1) + (101 - q5) + (101 - q9) + (101 - q13) + (101 - q17);
+      const auditory = (101 - q2) + (101 - q6) + (101 - q10) + (101 - q14) + (101 - q18);
+      const visual = (101 - q3) + (101 - q7) + (101 - q11) + (101 - q15) + (101 - q19);
+      const readingWriting = (101 - q4) + (101 - q8) + (101 - q12) + (101 - q16) + (101 - q20);
+      
+      // Determine which category has the highest score.
+      const maxScore = Math.max(kinesthetic, auditory, visual, readingWriting);
+      let learnerType = "";
+      
+      if (maxScore === kinesthetic) {
+        learnerType = "Kinesthetic";
+      } else if (maxScore === auditory) {
+        learnerType = "Auditory";
+      } else if (maxScore === visual) {
+        learnerType = "Visual";
+      } else if (maxScore === readingWriting) {
+        learnerType = "Reading/Writing";
+      }
+      
+      document.getElementById("result-text").innerText = "Your preferred learning style is: " + learnerType;
+      document.getElementById("result-modal").style.display = "flex";
+    });
+    
+    function closeResultModal() {
+      document.getElementById("result-modal").style.display = "none";
+    }
+    
+    window.onclick = function(event) {
+      const modal = document.getElementById("result-modal");
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
+</file>
+
+<file path="templates/chatbot.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot | Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Chatbot</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/diagnostic">Diagnostic Test</a></li>
+          <li><a href="/learning_style">Learning Style</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section class="chat-instructions container">
+    <h2>How to Use</h2>
+    <p>Welcome to the Scholar AI Chatbot! Type your queries in the input box and press 'Send' to start a conversation with our AI-powered assistant.</p>
+    <ul>
+      <li>Ask educational questions and get AI-generated responses.</li>
+      <li>Use clear and concise language for better responses.</li>
+      <li>Enjoy interactive and engaging learning!</li>
+    </ul>
+  </section>
+
+  <main class="chat-container container">
+    <div id="chat-box" class="chat-log">
+      <!-- Chat messages will appear here -->
+    </div>
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" placeholder="Type your message here..." autocomplete="off" required></textarea>
+      <button type="submit" class="send-button">Send</button>
+    </form>
+  </main>
+
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+  
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>
+</file>
+
+<file path="topic_prompts/initial_prompt.txt">
+Everytime someone runs this program erase all previous data about this person and start off by saying "Hi I am scholar AI how many I help you today?"
+
+Role & Purpose
+You are an AI Scholar, an intelligent and adaptive tutoring assistant designed to help students diagnose their weaknesses, create study schedules, and provide targeted learning resources. Your goal is to identify student strengths and weaknesses through diagnostic tests and generate personalized study plans that fit their learning style and schedule.
+Core Functionality
+1. Course Selection & Customization
+Upon startup, ask the student:
+"Which subject would you like to study?"
+"Are there specific topics or a syllabus you’d like to follow?"
+If they provide a syllabus, structure the diagnostic and study plan accordingly.
+If not, create a well-balanced test covering essential topics.
+"Do you have a timeline or deadline for your studies?"
+
+2. Diagnostic Testing
+Before providing study materials, administer a 15-question diagnostic test (or 20 questions for AP/IB courses). The test should include:
+Multiple-Choice Questions (MCQs) to assess factual understanding and problem-solving skills.
+Free-Response Questions (FRQs) to evaluate deeper comprehension and application of concepts.
+Examples:
+For Algebra:
+MCQ: "Solve for x in 2x + 3 = 15."
+FRQ: "Explain how the quadratic formula is derived and solve x² - 4x - 5 = 0."
+For Biology:
+MCQ: "What is the function of mitochondria in a cell?"
+FRQ: "Describe the process of cellular respiration, including key reactants and products."
+For SAT Math:
+MCQ: "What is the slope of the line passing through (3,4) and (7,10)?"
+FRQ: "Solve the following system of equations and explain your method."
+
+3. Strengths & Weaknesses Analysis
+Once the student completes the diagnostic test, analyze their strong and weak areas. Provide a detailed report that:
+Lists the topics they performed well in 
+Identifies weak points that need improvement 
+Gives an explanation of their errors, if applicable.
+
+4. Learning Style Assessment
+Before creating a study plan, ask:
+ "What is your preferred learning style?"
+ Provide descriptions of common learning styles:
+Visual Learner – Prefers diagrams, charts, and videos.
+Auditory Learner – Learns best through listening (lectures, podcasts).
+Reading/Writing Learner – Retains information through text-based materials.
+Kinesthetic Learner – Learns best with hands-on practice and real-world examples.
+Mixed Learning Style – A combination of two or more of the above.
+
+5. Personalized Study Plan & Schedule
+Based on weak areas and learning style, generate a custom study schedule that fits their availability.
+Ask: "How many hours per day/week can you dedicate to studying?"
+Adapt the study plan to their deadlines and pace.
+If they fall behind, suggest a catch-up plan.
+
+6. Learning Resources & Study Materials
+For each weak topic, provide:
+    Khan Academy Videos
+Summarize each video and explain its relevance.
+Example: "This Khan Academy video explains Newton's Laws with animations—useful for understanding force and motion."
+    Quizlet Flashcard Sets (if available)
+Example: "This Quizlet set covers SAT vocabulary and key math formulas."
+    MIT OpenCourseWare Links
+Provide links to relevant lecture notes and problem sets.
+    Additional YouTube Videos
+Search for and recommend videos that align with the student’s weak areas.
+
+7. ACT/SAT Prep (If Selected)
+If the student chooses ACT/SAT prep, ask:
+"What is your target score?"
+"Which sections do you struggle with the most?"
+Generate a section-wise prep plan with:
+Timed practice tests
+Strategy guides
+Concept explanations
+
+8. Teacher & Assignment Integration (Future Feature)
+If used in a classroom, allow teachers to:
+Assign diagnostic tests and projects
+Set deadlines
+Track student progress
+A potential paid version could include additional teacher tools for managing students and assignments.
+
+9. Deadline Management
+Allow students to set deadlines for topics/tests.
+Send reminders and progress updates.
+Adjust schedules dynamically if they fall behind.
+
+Behavioral Guidelines
+Be student-friendly: Provide clear, engaging, and supportive responses.
+Be flexible: Adapt to different learning paces.
+Avoid overloading students: Balance study plans to prevent burnout.
+Encourage progress tracking: Motivate students with milestones.
+
+
+Student has chosen the subject: General
+<<<<<<< HEAD
+=======
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+>>>>>>> dea6026bffe0ddb9bba95bace6b5a565d2a987fe
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+
+
+Student has chosen the subject: General
+</file>
+
+<file path="templates/index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scholar AI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Scholar AI</h1>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li class="dropdown">
+            <a href="javascript:void(0)" class="dropbtn">Tests</a>
+            <div class="dropdown-content">
+              <a href="/diagnostic">Diagnostic Test</a>
+              <a href="/learning_style">Learning Style</a>
+            </div>
+          </li>
+          <li><a href="/chatbot">Chatbot</a></li>
+          <li><a href="/schedule">Schedule</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <section id="hero" class="hero">
+    <div class="container">
+      <h2>AI-Powered Learning for Everyone</h2>
+      <p>Enhance your teaching and learning experience with Scholar AI.</p>
+      <div class="hero-buttons">
+        <button onclick="toggleModal('sign-in-modal')">Sign In</button>
+        <button onclick="toggleModal('sign-up-modal')">Sign Up</button>
+      </div>
+    </div>
+  </section>
+  <!-- Sign In Modal -->
+  <div id="sign-in-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="toggleModal('sign-in-modal')">&times;</span>
+      <h2>Sign In</h2>
+      <form id="sign-in-form">
+        <input type="text" id="login-username" placeholder="Username" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit">Sign In</button>
+      </form>
+    </div>
+  </div>
+  <!-- Sign Up Modal -->
+  <div id="sign-up-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="toggleModal('sign-up-modal')">&times;</span>
+      <h2>Sign Up</h2>
+      <!-- this should be commented out -->
+      <form id="sign-up-form">
+        <input type="text" id="signup-username" placeholder="Username" required />
+        <input type="password" id="signup-password" placeholder="Password" required />
+        <button type="submit">Sign Up</button>
+      </form>
+    </div>
+  </div>
+  <section id="features" class="features">
+    <div class="container">
+      <h2>Key Features</h2>
+      <div class="feature">
+        <h3>Interactive AI Tutor</h3>
+        <p>Get real-time assistance with AI-powered tutoring.</p>
+      </div>
+      <div class="feature">
+        <h3>Lesson Planning</h3>
+        <p>AI-generated lesson plans tailored to your needs.</p>
+      </div>
+      <div class="feature">
+        <h3>Student Analytics</h3>
+        <p>Track and improve student performance with AI insights.</p>
+      </div>
+    </div>
+  </section>
+  <section id="about" class="about">
+    <div class="container">
+      <h2>About Scholar AI</h2>
+      <p>Scholar AI leverages cutting-edge artificial intelligence to enhance educational experiences for both teachers and students.</p>
+      <p></p>
+      <p>To utilize ScholarAI make sure to head to the diagnostic page before getting feadback from our AI.</p>
+    </div>
+  </section>
+  <section id="contact" class="contact">
+    <div class="container">
+      <h2>Contact Us</h2>
+      <p>
+        Have questions or need assistance? Reach out to us at
+        <a href="mailto:support@scholarai.com">support@scholarai.com</a>.
+      </p>
+    </div>
+  </section>
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
+</file>
+
+<file path="app.py">
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
+import openai
+import os
+app = Flask(__name__)
+#test change
+# Session configuration
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+openai.api_key = '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'
+app.secret_key = 'supersecretkey'
+# Home route
+@app.route('/')
+def home():
+    return render_template('index.html')
+@app.route('/diagnostic')
+def diagnostic():
+    return render_template('diagnostic.html')
+@app.route('/chatbot')
+def chatbot_page():
+    return render_template('chatbot.html')
+@app.route('/learning_style')
+def learning_style():
+    return render_template('learning_styles.html')
+@app.route('/schedule')
+def schedule():
+    return render_template('schedule.html')
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_message = request.json.get('message', '')
+    subject = request.json.get('subject', 'General Knowledge')
+    
+    if 'conversation' not in session:
+        session['conversation'] = []
+    
+    if user_message:
+        session['conversation'].append({"role": "user", "content": user_message})
+    text_file_path = 'topic_prompts/initial_prompt.txt'
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
+    # Ensure the file exists before appending
+    if not os.path.exists(text_file_path):
+        with open(text_file_path, 'w') as file:
+            file.write("Initial prompt for chatbot interaction.\n")
+    with open(text_file_path, 'a') as file: 
+        file.write(f"\n\nStudent has chosen the subject: {subject}\n")
+    with open(text_file_path, 'r') as file:
+        initial_prompt = file.read()
+    messages = [{"role": "system", "content": initial_prompt}] + session['conversation']
+    try:
+        # Make API call to OpenAI using the messages
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo-1106",
+            messages=messages
+        )
+        # Extract the content from the response
+        gpt_response = response.choices[0].message.content
+        # Append the GPT response to the conversation history
+        session['conversation'].append({
+            "role": "assistant",
+            "content": gpt_response
+        })
+
+        # Return a valid JSON response
+        return jsonify({'response': gpt_response})
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+        return jsonify({'error': str(e)}), 500
+   
+# Clear session route
+@app.route('/clear_session', methods=['GET'])
+def clear_session():
+    # Clear the session
+    session.clear()
+    return jsonify({'status': 'session cleared'})
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=8080)
+</file>
+
+</files>
