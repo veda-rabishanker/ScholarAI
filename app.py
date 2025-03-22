@@ -16,8 +16,7 @@ Session(app)
 # Force the logger to show INFO level messages
 app.logger.setLevel(logging.INFO)
 
-openai.api_key = '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'
-app.secret_key = 'supersecretkey'
+
 
 # --------------------- Routes ---------------------
 
