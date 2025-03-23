@@ -6,6 +6,41 @@
   <title>Diagnostic Test | Scholar AI</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+  <style>
+    /* Loading overlay styles */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.5em;
+      font-weight: bold;
+      z-index: 1000;
+      display: none; /* Hidden by default */
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 6px solid rgba(255, 255, 255, 0.3);
+      border-top: 6px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -99,6 +134,12 @@
     </div>
   </footer>
 
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">Generating Test...</p>
+  </div>
+
   <!-- You can still include chat.js if needed; it doesn't conflict -->
   <script src="{{ url_for('static', filename='chat.js') }}"></script>
 
@@ -108,6 +149,8 @@
       const generateForm = document.getElementById('generate-test-form');
       const testOutput = document.getElementById('test-output');
       const answersForm = document.getElementById('answers-form');
+      const loadingOverlay = document.getElementById('loading-overlay');
+      const loadingText = document.getElementById('loading-text');
 
       generateForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -115,6 +158,10 @@
         const subject = document.getElementById('subject').value.trim();
         const gradeLevel = document.getElementById('grade-level').value.trim();
         const topic = document.getElementById('topic').value.trim();
+
+        // Set loading text and show overlay for generating test
+        loadingText.textContent = "Generating Test...";
+        loadingOverlay.style.display = "flex";
 
         fetch('/generate_test', {
           method: 'POST',
@@ -127,6 +174,9 @@
         })
         .then(response => response.json())
         .then(data => {
+          // Hide overlay when the response is received
+          loadingOverlay.style.display = "none";
+
           if (data.diagnostic_test) {
             // Display the generated test
             testOutput.innerHTML = `
@@ -142,12 +192,17 @@
         .catch(error => {
           console.error('Error generating test:', error);
           alert('An error occurred while generating the test.');
+          loadingOverlay.style.display = "none"; // Hide overlay on error
         });
       });
 
       // 2) Submit Answers
       answersForm.addEventListener('submit', function(e) {
         e.preventDefault();
+
+        // Set loading text and show overlay for submitting answers
+        loadingText.textContent = "Submitting Answers...";
+        loadingOverlay.style.display = "flex";
 
         // Gather answers from form
         const formData = new FormData(answersForm);
@@ -163,6 +218,9 @@
         })
         .then(response => response.json())
         .then(data => {
+          // Hide the overlay once the submission is done
+          loadingOverlay.style.display = "none";
+
           if (data.status === 'ok') {
             alert('Your answers have been submitted successfully!');
           } else {
@@ -172,6 +230,7 @@
         .catch(err => {
           console.error('Error submitting answers:', err);
           alert('An error occurred while submitting your answers.');
+          loadingOverlay.style.display = "none";
         });
       });
     });
