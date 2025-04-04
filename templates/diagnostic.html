@@ -23,7 +23,7 @@
       font-size: 1.5em;
       font-weight: bold;
       z-index: 1000;
-      display: none; /* Hidden by default */
+      display: none;
     }
 
     .spinner {
@@ -39,6 +39,46 @@
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
+    }
+    
+    /* Question and answer styling */
+    .question-answer-pair {
+      margin-bottom: 30px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    
+    .question-text {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    
+    .answer-choices {
+      margin-bottom: 15px;
+      padding-left: 20px;
+    }
+    
+    .answer-input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    
+    #answers-form {
+      margin-top: 20px;
+    }
+    
+    #questions-container {
+      counter-reset: question-counter;
+    }
+    
+    .question-text:before {
+      counter-increment: question-counter;
+      content: "Question " counter(question-counter) ": ";
     }
   </style>
 </head>
@@ -58,7 +98,6 @@
   </header>
 
   <main class="chat-container container">
-    <!-- Section for generating the diagnostic test -->
     <div id="diagnostic-test-section">
       <h2>Generate a Diagnostic Test</h2>
       <form id="generate-test-form">
@@ -74,55 +113,11 @@
         <button type="submit">Generate Test</button>
       </form>
 
-      <!-- Container to display generated test -->
-      <div id="test-output" class="test-box" aria-live="polite"></div>
-
-      <!-- Answers Form (hidden until a test is generated) -->
-      <form id="answers-form" style="display:none; margin-top: 20px;">
-        <h3>Enter Your Answers</h3>
-        <p>Type your answers for each of the 10 questions. For multiple-choice, enter A, B, C, or D. For free-response, type your best short answer.</p>
-        <ol>
-          <li>
-            <label>Answer 1:</label>
-            <input type="text" name="answer1" required>
-          </li>
-          <li>
-            <label>Answer 2:</label>
-            <input type="text" name="answer2" required>
-          </li>
-          <li>
-            <label>Answer 3:</label>
-            <input type="text" name="answer3" required>
-          </li>
-          <li>
-            <label>Answer 4:</label>
-            <input type="text" name="answer4" required>
-          </li>
-          <li>
-            <label>Answer 5:</label>
-            <input type="text" name="answer5" required>
-          </li>
-          <li>
-            <label>Answer 6:</label>
-            <input type="text" name="answer6" required>
-          </li>
-          <li>
-            <label>Answer 7:</label>
-            <input type="text" name="answer7" required>
-          </li>
-          <li>
-            <label>Answer 8:</label>
-            <input type="text" name="answer8" required>
-          </li>
-          <li>
-            <label>Answer 9:</label>
-            <input type="text" name="answer9" required>
-          </li>
-          <li>
-            <label>Answer 10:</label>
-            <input type="text" name="answer10" required>
-          </li>
-        </ol>
+      <!-- Answers Form (hidden until test is generated) -->
+      <form id="answers-form" style="display:none;">
+        <h3>Diagnostic Test</h3>
+        <p>Please answer each question below:</p>
+        <div id="questions-container"></div>
         <button type="submit">Submit Answers</button>
       </form>
     </div>
@@ -140,15 +135,11 @@
     <p id="loading-text">Generating Test...</p>
   </div>
 
-  <!-- You can still include chat.js if needed; it doesn't conflict -->
-  <script src="{{ url_for('static', filename='chat.js') }}"></script>
-
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      // 1) Generate Test
       const generateForm = document.getElementById('generate-test-form');
-      const testOutput = document.getElementById('test-output');
       const answersForm = document.getElementById('answers-form');
+      const questionsContainer = document.getElementById('questions-container');
       const loadingOverlay = document.getElementById('loading-overlay');
       const loadingText = document.getElementById('loading-text');
 
@@ -159,7 +150,6 @@
         const gradeLevel = document.getElementById('grade-level').value.trim();
         const topic = document.getElementById('topic').value.trim();
 
-        // Set loading text and show overlay for generating test
         loadingText.textContent = "Generating Test...";
         loadingOverlay.style.display = "flex";
 
@@ -174,17 +164,12 @@
         })
         .then(response => response.json())
         .then(data => {
-          // Hide overlay when the response is received
           loadingOverlay.style.display = "none";
 
           if (data.diagnostic_test) {
-            // Display the generated test
-            testOutput.innerHTML = `
-              <h3>Generated Diagnostic Test:</h3>
-              <p>${data.diagnostic_test.replace(/\n/g, '<br>')}</p>
-            `;
-            // Show the answers form
+            createQuestionAnswerPairs(data.diagnostic_test);
             answersForm.style.display = 'block';
+            document.querySelector('.question-answer-pair')?.scrollIntoView({ behavior: 'smooth' });
           } else if (data.error) {
             alert(data.error);
           }
@@ -192,24 +177,20 @@
         .catch(error => {
           console.error('Error generating test:', error);
           alert('An error occurred while generating the test.');
-          loadingOverlay.style.display = "none"; // Hide overlay on error
+          loadingOverlay.style.display = "none";
         });
       });
 
-      // 2) Submit Answers
       answersForm.addEventListener('submit', function(e) {
         e.preventDefault();
 
-        // Set loading text and show overlay for submitting answers
         loadingText.textContent = "Submitting Answers...";
         loadingOverlay.style.display = "flex";
 
-        // Gather answers from form
-        const formData = new FormData(answersForm);
         const answers = {};
-        for (let [key, value] of formData.entries()) {
-          answers[key] = value;
-        }
+        document.querySelectorAll('.answer-input').forEach((input, index) => {
+          answers[`answer${index + 1}`] = input.value;
+        });
 
         fetch('/submit_test', {
           method: 'POST',
@@ -218,21 +199,77 @@
         })
         .then(response => response.json())
         .then(data => {
-          // Hide the overlay once the submission is done
           loadingOverlay.style.display = "none";
-
           if (data.status === 'ok') {
-            alert('Your answers have been submitted successfully!');
+            alert('Answers submitted successfully!');
           } else {
-            alert('There was an error submitting your answers.');
+            alert('Error submitting answers.');
           }
         })
         .catch(err => {
           console.error('Error submitting answers:', err);
-          alert('An error occurred while submitting your answers.');
+          alert('Submission error occurred.');
           loadingOverlay.style.display = "none";
         });
       });
+      
+      function createQuestionAnswerPairs(testContent) {
+        questionsContainer.innerHTML = '';
+        
+        // Split by double newlines to separate questions
+        const rawQuestions = testContent.split(/\n\n+/);
+        let questionCount = 0;
+        
+        rawQuestions.forEach((rawQuestion) => {
+          if (questionCount >= 10) return;
+          
+          const lines = rawQuestion.split('\n').filter(line => line.trim() !== '');
+          if (lines.length === 0) return;
+          
+          const questionText = lines[0];
+          const answerChoices = lines.slice(1);
+          
+          if (questionText && questionText.trim() !== '') {
+            questionCount++;
+            createQuestionElement(questionCount, questionText, answerChoices);
+          }
+        });
+      }
+      
+      function createQuestionElement(number, questionText, answerChoices) {
+        const pairDiv = document.createElement('div');
+        pairDiv.className = 'question-answer-pair';
+        
+        const questionEl = document.createElement('div');
+        questionEl.className = 'question-text';
+        questionEl.textContent = questionText;
+        
+        pairDiv.appendChild(questionEl);
+        
+        if (answerChoices.length > 0) {
+          const choicesEl = document.createElement('div');
+          choicesEl.className = 'answer-choices';
+          
+          answerChoices.forEach(choice => {
+            const choiceEl = document.createElement('div');
+            choiceEl.textContent = choice;
+            choicesEl.appendChild(choiceEl);
+          });
+          
+          pairDiv.appendChild(choicesEl);
+        }
+        
+        const answerInput = document.createElement('input');
+        answerInput.type = 'text';
+        answerInput.className = 'answer-input';
+        answerInput.required = true;
+        answerInput.placeholder = answerChoices.length > 0 ? 
+          'Enter your choice (A, B, C, D) or answer' : 
+          'Type your answer here...';
+        
+        pairDiv.appendChild(answerInput);
+        questionsContainer.appendChild(pairDiv);
+      }
     });
   </script>
 </body>
