@@ -6,45 +6,106 @@
   <title>Learning Style Diagnostic Test | Scholar AI</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <style>
-    /* Basic styling for the slider-based test */
-    ol li {
-      background-color: #e4e1e1;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
+    /* Main container styling */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
     }
-    .slider-container {
+    
+    /* Grid layout for questions */
+    .questions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    /* Question card styling */
+    .question-card {
+      background-color: #f5f7fa;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    
+    .question-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .question-card p {
+      margin-bottom: 15px;
+      font-size: 16px;
+      line-height: 1.4;
+      color: #333;
+      min-height: 60px;
       display: flex;
       align-items: center;
-      max-width: 500px;
+      justify-content: center;
+    }
+    
+    /* Compact slider styling */
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       margin-top: 10px;
     }
-    .slider-label {
-      width: 60px;
-      font-weight: bold;
+    
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 5px;
+      font-size: 12px;
     }
+    
+    .slider-labels span:first-child { color: #e74c3c; } /* Red for Disagree */
+    .slider-labels span:last-child { color: #2ecc71; } /* Green for Agree */
+    
     .slider {
-      flex: 1;
-      margin: 0 10px;
+      width: 90%;
+      height: 8px;
       -webkit-appearance: none;
-      height: 10px;
+      background: #e74c3c; /* Start with red (disagree) */
       border-radius: 5px;
-      background: #ccc;
       outline: none;
+      transition: background 0.2s;
     }
-    /* Webkit Thumb */
+    
     .slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      appearance: none;
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: #295281;
+      background: white;
       cursor: pointer;
-      border: none;
+      border: 2px solid #295281;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    /* Styling for the result modal */
+    
+    /* Submit button styling */
+    .submit-btn {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 30px;
+      background-color: #295281;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .submit-btn:hover {
+      background-color: #1d3a5f;
+    }
+    
+    /* Result modal styling */
     #result-modal {
       display: none;
       position: fixed;
@@ -58,39 +119,71 @@
       align-items: center;
       justify-content: center;
     }
+    
     #result-modal .modal-content {
       background: #fff;
       margin: auto;
-      padding: 20px;
-      border-radius: 8px;
+      padding: 30px;
+      border-radius: 10px;
       width: 80%;
-      max-width: 400px;
+      max-width: 500px;
       position: relative;
       animation: fadeIn 0.3s;
       text-align: center;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
+    
     #result-modal .close {
       position: absolute;
-      right: 15px;
-      top: 10px;
+      right: 20px;
+      top: 15px;
       font-size: 24px;
       cursor: pointer;
+      color: #777;
     }
+    
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-20px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      .questions-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .question-card p {
+        min-height: auto;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .question-card {
+        padding: 15px;
+      }
+      
+      .slider {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>Learning Style Diagnostic Test</h1>
+      <h1>Scholar AI</h1>
       <nav>
         <ul>
           <li><a href="/">Home</a></li>
+          <li class="dropdown">
+            <a href="javascript:void(0)" class="dropbtn">Tests</a>
+            <div class="dropdown-content">
+              <a href="/diagnostic">Diagnostic Test</a>
+              <a href="/learning_style">Learning Style</a>
+            </div>
+          </li>
           <li><a href="/chatbot">Chatbot</a></li>
-          <li><a href="/diagnostic">Diagnostic Test</a></li>
           <li><a href="/schedule">Schedule</a></li>
         </ul>
       </nav>
@@ -102,195 +195,255 @@
       <h2>Instructions</h2>
       <p>
         For each statement below, adjust the slider to indicate your level of agreement.
-        The left end represents "Agree" and the right end "Disagree." The slider's midpoint is neutral.
-        Answer all 20 questions honestly to help determine your best learning style.
+        The left end represents "Disagree" and the right end "Agree." Answer all 20 questions
+        honestly to help determine your best learning style.
       </p>
     </section>
 
     <form id="learning-style-form">
-      <ol>
+      <div class="questions-grid">
         <!-- Question 1 (Kinesthetic) -->
-        <li>
+        <div class="question-card">
           <p>I prefer hands-on learning activities to understand new concepts.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q1" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 2 (Visual) -->
-        <li>
+        <div class="question-card">
           <p>I learn best when I use diagrams, charts, or other visual aids.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q2" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 3 (Auditory) -->
-        <li>
+        <div class="question-card">
           <p>I remember things better when I hear them rather than when I read them.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q3" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 4 (Reading/Writing) -->
-        <li>
+        <div class="question-card">
           <p>I learn best when I take notes or write summaries of what I'm studying.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q4" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 5 (Kinesthetic) -->
-        <li>
+        <div class="question-card">
           <p>I enjoy learning through physical movement or role-playing activities.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q5" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 6 (Auditory) -->
-        <li>
+        <div class="question-card">
           <p>I learn best by listening to lectures or discussions.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q6" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 7 (Visual) -->
-        <li>
+        <div class="question-card">
           <p>I find it easier to understand complex concepts when I see them visually.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q7" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 8 (Reading/Writing) -->
-        <li>
+        <div class="question-card">
           <p>I find that writing summaries or lists helps me understand and remember information.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q8" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 9 (Kinesthetic) -->
-        <li>
+        <div class="question-card">
           <p>I often remember information better when I can touch or manipulate objects related to the subject.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q9" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 10 (Auditory) -->
-        <li>
+        <div class="question-card">
           <p>I prefer to discuss topics with others to understand them.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q10" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 11 (Visual) -->
-        <li>
+        <div class="question-card">
           <p>I often use visual aids such as images or videos to support my learning.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q11" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 12 (Reading/Writing) -->
-        <li>
+        <div class="question-card">
           <p>I often use written instructions or textbooks to study new topics.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q12" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 13 (Kinesthetic) -->
-        <li>
+        <div class="question-card">
           <p>I find it easier to understand instructions if I can perform the task immediately.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q13" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 14 (Auditory) -->
-        <li>
+        <div class="question-card">
           <p>I often use my voice to help memorize and process information.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q14" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 15 (Visual) -->
-        <li>
+        <div class="question-card">
           <p>I prefer reading materials that include pictures or infographics.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q15" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 16 (Reading/Writing) -->
-        <li>
+        <div class="question-card">
           <p>I enjoy taking detailed notes and rewriting them to reinforce my learning.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q16" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 17 (Kinesthetic) -->
-        <li>
+        <div class="question-card">
           <p>I enjoy learning through physical activities and interactive experiences.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q17" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 18 (Auditory) -->
-        <li>
+        <div class="question-card">
           <p>I find that listening to audio recordings aids my learning.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q18" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 19 (Visual) -->
-        <li>
+        <div class="question-card">
           <p>I recall information better when I see it in written or drawn form.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q19" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
+        </div>
+        
         <!-- Question 20 (Reading/Writing) -->
-        <li>
+        <div class="question-card">
           <p>I enjoy writing out detailed explanations to help myself understand a topic better.</p>
           <div class="slider-container">
-            <span class="slider-label">Agree</span>
+            <div class="slider-labels">
+              <span>Disagree</span>
+              <span>Agree</span>
+            </div>
             <input type="range" name="q20" class="slider" min="1" max="100" value="50" required>
-            <span class="slider-label">Disagree</span>
           </div>
-        </li>
-      </ol>
-      <button type="submit">Submit Test</button>
+        </div>
+      </div>
+      
+      <button type="submit" class="submit-btn">Submit Test</button>
     </form>
   </main>
 
@@ -310,68 +463,57 @@
   </footer>
 
   <script>
-    // Update each slider's background so blue fills from the center.
+    // Update slider appearance based on value
     const sliders = document.querySelectorAll('.slider');
     sliders.forEach(slider => {
+      // Initialize slider appearance
+      updateSliderStyle(slider);
+      
+      // Update on user interaction
       slider.addEventListener('input', function() {
-        const val = parseInt(this.value);
-        if (val >= 50) {
-          // For values above center, blue fills from 50% to current value.
-          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc 50%, #4a90e2 50%, #4a90e2 ${val}%, #ccc ${val}%, #ccc 100%)`;
-        } else {
-          // For values below center, blue fills from current value to 50%.
-          this.style.background = `linear-gradient(to right, #ccc 0%, #ccc ${val}%, #4a90e2 ${val}%, #4a90e2 50%, #ccc 50%, #ccc 100%)`;
-        }
+        updateSliderStyle(this);
       });
-      // Initialize the slider background.
-      slider.dispatchEvent(new Event('input'));
     });
-
+    
+    function updateSliderStyle(slider) {
+      const val = parseInt(slider.value);
+      // Calculate color gradient from red (disagree) to green (agree)
+      const red = Math.round(231 - (231 - 46) * (val/100));
+      const green = Math.round(76 + (171 - 76) * (val/100));
+      const blue = Math.round(60 - (60 - 182) * (val/100));
+      
+      slider.style.background = `rgb(${red}, ${green}, ${blue})`;
+    }
+    
+    // Form submission handler
     document.getElementById('learning-style-form').addEventListener('submit', function(event) {
       event.preventDefault();
-      // Gather slider responses
-      const q1 = parseInt(document.querySelector('input[name="q1"]').value);
-      const q2 = parseInt(document.querySelector('input[name="q2"]').value);
-      const q3 = parseInt(document.querySelector('input[name="q3"]').value);
-      const q4 = parseInt(document.querySelector('input[name="q4"]').value);
-      const q5 = parseInt(document.querySelector('input[name="q5"]').value);
-      const q6 = parseInt(document.querySelector('input[name="q6"]').value);
-      const q7 = parseInt(document.querySelector('input[name="q7"]').value);
-      const q8 = parseInt(document.querySelector('input[name="q8"]').value);
-      const q9 = parseInt(document.querySelector('input[name="q9"]').value);
-      const q10 = parseInt(document.querySelector('input[name="q10"]').value);
-      const q11 = parseInt(document.querySelector('input[name="q11"]').value);
-      const q12 = parseInt(document.querySelector('input[name="q12"]').value);
-      const q13 = parseInt(document.querySelector('input[name="q13"]').value);
-      const q14 = parseInt(document.querySelector('input[name="q14"]').value);
-      const q15 = parseInt(document.querySelector('input[name="q15"]').value);
-      const q16 = parseInt(document.querySelector('input[name="q16"]').value);
-      const q17 = parseInt(document.querySelector('input[name="q17"]').value);
-      const q18 = parseInt(document.querySelector('input[name="q18"]').value);
-      const q19 = parseInt(document.querySelector('input[name="q19"]').value);
-      const q20 = parseInt(document.querySelector('input[name="q20"]').value);
       
-      // Invert scores: lower slider value (closer to Agree) gives higher points.
-      const kinesthetic = (101 - q1) + (101 - q5) + (101 - q9) + (101 - q13) + (101 - q17);
-      const auditory = (101 - q2) + (101 - q6) + (101 - q10) + (101 - q14) + (101 - q18);
-      const visual = (101 - q3) + (101 - q7) + (101 - q11) + (101 - q15) + (101 - q19);
-      const readingWriting = (101 - q4) + (101 - q8) + (101 - q12) + (101 - q16) + (101 - q20);
-      
-      // Determine which category has the highest score.
-      const maxScore = Math.max(kinesthetic, auditory, visual, readingWriting);
-      let learnerType = "";
-      
-      if (maxScore === kinesthetic) {
-        learnerType = "Kinesthetic";
-      } else if (maxScore === auditory) {
-        learnerType = "Auditory";
-      } else if (maxScore === visual) {
-        learnerType = "Visual";
-      } else if (maxScore === readingWriting) {
-        learnerType = "Reading/Writing";
+      // Gather all slider responses
+      const responses = [];
+      for (let i = 1; i <= 20; i++) {
+        responses.push(parseInt(document.querySelector(`input[name="q${i}"]`).value));
       }
       
-      document.getElementById("result-text").innerText = "Your preferred learning style is: " + learnerType;
+      // Calculate scores for each learning style
+      const kinesthetic = responses[0] + responses[4] + responses[8] + responses[12] + responses[16];
+      const visual = responses[1] + responses[5] + responses[9] + responses[13] + responses[17];
+      const auditory = responses[2] + responses[6] + responses[10] + responses[14] + responses[18];
+      const readingWriting = responses[3] + responses[7] + responses[11] + responses[15] + responses[19];
+      
+      // Determine which category has the highest score
+      const scores = {
+        "Kinesthetic": kinesthetic,
+        "Visual": visual,
+        "Auditory": auditory,
+        "Reading/Writing": readingWriting
+      };
+      
+      const maxScore = Math.max(...Object.values(scores));
+      const learnerType = Object.keys(scores).find(key => scores[key] === maxScore);
+      
+      // Display result
+      document.getElementById("result-text").innerText = `Your preferred learning style is: ${learnerType}`;
       document.getElementById("result-modal").style.display = "flex";
     });
     
