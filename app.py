@@ -16,7 +16,7 @@ Session(app)
 # Force the logger to show INFO level messages
 app.logger.setLevel(logging.INFO)
 
-openai.api_key = ""
+openai.api_key = "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"
 
 # --------------------- Routes ---------------------
 
@@ -30,6 +30,81 @@ def diagnostic():
     # Renders the page where users can generate and answer a 10-question diagnostic
     return render_template('diagnostic.html')
 
+@app.route('/results')
+def results():
+    # Diagnostic results
+    diagnostic_analysis = session.get('latest_diagnostic_analysis', '')
+    test_questions = session.get('latest_diagnostic_test', '')
+    test_answers = session.get('latest_test_answers', {})
+    
+    # Learning style results
+    learning_style_scores = session.get('learning_style_scores', {})
+    learning_interpretation = session.get('learning_style_interpretation', '')
+    primary_style = session.get('primary_learning_style', '')
+    
+    return render_template('results.html',
+                         diagnostic_analysis=diagnostic_analysis,
+                         test_questions=test_questions,
+                         test_answers=test_answers,
+                         learning_scores=learning_style_scores,
+                         learning_interpretation=learning_interpretation,
+                         primary_style=primary_style)
+@app.route('/submit_learning_style', methods=['POST'])
+def submit_learning_style():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data received"}), 400
+    
+    try:
+        # Store raw scores
+        session['learning_style_scores'] = {
+            'visual': data.get('visual', 0),
+            'auditory': data.get('auditory', 0),
+            'reading_writing': data.get('reading_writing', 0),
+            'kinesthetic': data.get('kinesthetic', 0)
+        }
+        
+        # Determine primary learning style
+        max_score = max(session['learning_style_scores'].values())
+        primary_style = [k for k, v in session['learning_style_scores'].items() if v == max_score][0]
+        
+        # Generate a detailed interpretation
+        interpretation_prompt = (
+            f"Student's learning style scores:\n"
+            f"Visual: {session['learning_style_scores']['visual']}\n"
+            f"Auditory: {session['learning_style_scores']['auditory']}\n"
+            f"Reading/Writing: {session['learning_style_scores']['reading_writing']}\n"
+            f"Kinesthetic: {session['learning_style_scores']['kinesthetic']}\n\n"
+            f"The primary learning style is {primary_style}.\n"
+            "Provide a 3-4 paragraph interpretation of these results, including:\n"
+            "1. What this learning style means\n"
+            "2. Study strategies that would be effective\n"
+            "3. Potential challenges and how to overcome them\n"
+            "Use simple, clear language suitable for students."
+        )
+        
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": interpretation_prompt}],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        if response.choices:
+            session['learning_style_interpretation'] = response.choices[0].message.content
+            session['primary_learning_style'] = primary_style
+        else:
+            session['learning_style_interpretation'] = "Interpretation unavailable"
+        
+        return jsonify({
+            "status": "success",
+            "primary_style": primary_style,
+            "interpretation": session['learning_style_interpretation']
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error processing learning style: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/chatbot')
 def chatbot_page():
