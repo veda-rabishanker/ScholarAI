@@ -16,7 +16,7 @@ Session(app)
 # Force the logger to show INFO level messages
 app.logger.setLevel(logging.INFO)
 
-openai.api_key = ""
+openai.api_key = "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"
 
 # --------------------- Routes ---------------------
 
@@ -49,6 +49,24 @@ def results():
                          learning_scores=learning_style_scores,
                          learning_interpretation=learning_interpretation,
                          primary_style=primary_style)
+
+@app.route('/check_diagnostic_status', methods=['GET'])
+def check_diagnostic_status():
+    """Check if user has completed a diagnostic test"""
+    has_diagnostic = 'latest_test_answers' in session and session['latest_test_answers']
+    return jsonify({"has_diagnostic": has_diagnostic})
+
+
+@app.route('/check_learning_style_status', methods=['GET'])
+def check_learning_style_status():
+    """Check if user has completed the learning style assessment"""
+    has_learning_style = 'primary_learning_style' in session and session['primary_learning_style']
+    learning_style = session.get('primary_learning_style', '')
+    return jsonify({
+        "has_learning_style": bool(has_learning_style),
+        "learning_style": learning_style
+    })
+
 @app.route('/submit_learning_style', methods=['POST'])
 def submit_learning_style():
     data = request.get_json()
@@ -214,16 +232,12 @@ def submit_test():
 @app.route('/chat', methods=['POST'])
 def chat():
     """
-    Primary chatbot endpoint. Sends all context (test + answers) plus conversation 
+    Primary chatbot endpoint. Sends all context (test + answers + learning style) plus conversation 
     to the OpenAI model. Then returns the model's reply.
     """
     data = request.json or {}
     user_message = data.get('message', '')
     subject = data.get('subject', 'General Knowledge')
-
-    # Retrieve the stored diagnostic test and answers
-    diagnostic_test_text = session.get('latest_diagnostic_test', '')
-    test_answers = session.get('latest_test_answers', {})
 
     # Retrieve or create conversation history
     if 'conversation' not in session:
@@ -233,7 +247,15 @@ def chat():
     if user_message:
         session['conversation'].append({"role": "user", "content": user_message})
 
-    # We maintain an external prompt file for the base instructions
+    # Retrieve the stored diagnostic test and answers
+    diagnostic_test_text = session.get('latest_diagnostic_test', '')
+    test_answers = session.get('latest_test_answers', {})
+    
+    # Retrieve learning style information
+    primary_learning_style = session.get('primary_learning_style', '')
+    learning_style_scores = session.get('learning_style_scores', {})
+
+    # Read the initial prompt file but don't modify it
     text_file_path = 'topic_prompts/initial_prompt.txt'
     os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
 
@@ -246,59 +268,108 @@ def chat():
                 "and provide detailed feedback and next steps.\n"
             )
 
-    # We append the chosen subject for logging or reference
-    with open(text_file_path, 'a') as file:
-        file.write(f"\nStudent has chosen the subject: {subject}\n")
-
-    # Now read the entire prompt from file
+    # Read the file contents but don't append to it
     with open(text_file_path, 'r') as file:
         initial_prompt = file.read()
 
-    # Build context about the test & answers:
-    # Instruct the AI to evaluate them if the user asks about their performance
-    background_info = (
-        "You are Scholar AI, an adaptive tutor. "
-        "The user has completed a 10-question diagnostic test. "
-        "Below is the test and the user’s answers:\n\n"
+    # Add current subject context
+    system_content = initial_prompt + f"\n\nStudent has chosen the subject: {subject}\n\n"
+    
+    # Add instructions for automatic context recognition
+    system_content += (
+        "IMPORTANT: When a user first messages you or asks for help studying, "
+        "DO NOT ask generic questions about what subject they want to study. "
+        "Instead, immediately use the diagnostic test results and learning style information "
+        "provided below to offer personalized guidance. Assume they want help with the "
+        "material covered in their diagnostic test unless they specifically ask for something else.\n\n"
     )
-    if diagnostic_test_text:
-        background_info += "=== Diagnostic Test ===\n"
-        background_info += diagnostic_test_text + "\n\n"
-    if test_answers:
-        background_info += "=== Student's Answers ===\n"
+    
+    # Add diagnostic test information if available
+    if diagnostic_test_text and test_answers:
+        system_content += "=== Diagnostic Test ===\n"
+        system_content += diagnostic_test_text + "\n\n"
+        system_content += "=== Student's Answers ===\n"
         for key, val in test_answers.items():
-            background_info += f"{key}: {val}\n"
-        background_info += "\n"
-    background_info += (
-        "Please evaluate these answers for correctness, identify which ones are wrong, "
-        "explain the correct solutions, and offer any next steps or study tips. "
-        "If the user asks about their performance, provide a thorough analysis. "
-        "If the user has other questions, do your best to help using the context.\n"
-    )
+            system_content += f"{key}: {val}\n"
+        system_content += "\n"
+    
+    # Add learning style information if available
+    if primary_learning_style:
+        system_content += "=== Student's Learning Style ===\n"
+        system_content += f"Primary Learning Style: {primary_learning_style}\n"
+        if learning_style_scores:
+            system_content += "Scores:\n"
+            for style, score in learning_style_scores.items():
+                system_content += f"- {style}: {score}\n"
+        system_content += "\n"
+        system_content += (
+            f"The student has a {primary_learning_style} learning preference. "
+            f"Please tailor your explanations and suggestions accordingly. "
+            f"For this learning style, you should emphasize:\n"
+        )
+        
+        # Add specific guidance based on learning style
+        if primary_learning_style == 'visual':
+            system_content += (
+                "- Use diagrams, charts, and images in explanations\n"
+                "- Suggest visual study aids like mind maps and color coding\n"
+                "- Describe concepts with visual metaphors and spatial relationships\n"
+            )
+        elif primary_learning_style == 'auditory':
+            system_content += (
+                "- Explain concepts as if speaking them aloud\n"
+                "- Suggest verbal repetition and discussion-based learning\n"
+                "- Recommend audio recordings and verbal mnemonics\n"
+            )
+        elif primary_learning_style == 'reading_writing':
+            system_content += (
+                "- Structure information in written format with lists and paragraphs\n"
+                "- Suggest note-taking and written summaries as study techniques\n"
+                "- Emphasize the importance of text-based learning resources\n"
+            )
+        elif primary_learning_style == 'kinesthetic':
+            system_content += (
+                "- Relate concepts to physical experiences and real-world applications\n"
+                "- Suggest hands-on activities and practice-based learning\n"
+                "- Recommend movement and physical interaction while studying\n"
+            )
+    
+    # Add instructions for response
+    if diagnostic_test_text and test_answers:
+        system_content += (
+            "ALWAYS start by analyzing the diagnostic test results when the conversation begins "
+            "or when the user asks for help studying. Evaluate these answers for correctness, "
+            "identify which ones are wrong, explain the correct solutions, and offer "
+            "next steps or study tips tailored to their learning style.\n"
+        )
+    
+    system_content += "If the user has other questions, do your best to help using the context.\n"
 
-    # Combine the initial prompt + background info as a single system message
-    system_content = initial_prompt.strip() + "\n\n" + background_info.strip()
-
-    # Construct messages for the model
+    # Construct messages for the model - use the system message
     messages = [
         {"role": "system", "content": system_content}
     ] + session['conversation']
 
     app.logger.info("=== Chat Endpoint Called ===")
-    app.logger.info("Messages being sent to OpenAI:")
-    for i, msg in enumerate(messages, start=1):
-        role = msg['role'].upper()
-        app.logger.info(f"Message {i} ({role}):\n{msg['content']}")
+    app.logger.info(f"System message length: {len(system_content)} characters")
 
     try:
-        # Send the entire conversation to OpenAI
+        # If this is the first message from the user and we have diagnostic data,
+        # add an instruction to analyze test results right away
+        if len(session['conversation']) <= 1 and diagnostic_test_text and test_answers:
+            first_time_instruction = {
+                "role": "user", 
+                "content": "Please analyze my diagnostic test results and provide feedback."
+            }
+            messages.insert(1, first_time_instruction)  # Insert after system but before user message
+        
+        # Send the conversation to OpenAI
         response = openai.chat.completions.create(
             model="gpt-4o",
-            messages=messages
+            messages=messages,
+            temperature=0.7
         )
-        # Log the entire raw response
-        app.logger.info(f"Raw OpenAI response (chat):\n{response}")
-
+        
         # Safely extract the AI's reply
         if not response.choices:
             app.logger.error("No choices returned from OpenAI in chat")
@@ -328,6 +399,16 @@ def clear_session():
     """
     session.clear()
     return jsonify({'status': 'session cleared'})
+
+
+@app.route('/clear_conversation', methods=['POST'])
+def clear_conversation():
+    """
+    Clear only the conversation history but keep diagnostic and learning style data
+    """
+    # Only clear conversation history
+    session['conversation'] = []
+    return jsonify({'status': 'conversation cleared, data preserved'})
 
 
 if __name__ == '__main__':
