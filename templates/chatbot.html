@@ -93,6 +93,49 @@
       50% { opacity: 1; }
       100% { opacity: 0.4; }
     }
+
+    /* Learning style badge */
+    .learning-style-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 15px;
+      font-size: 14px;
+      margin-right: 10px;
+      color: black;
+      font-weight: 500;
+    }
+
+    .badge-visual {
+      background-color: #67a973;
+    }
+
+    .badge-auditory {
+      background-color: #e5a553;
+    }
+
+    .badge-reading-writing {
+      background-color: #823aa9;
+    }
+
+    .badge-kinesthetic {
+      background-color: #6bb0d8;
+    }
+
+    .chat-status {
+      background-color: #f8f9fa;
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .status-info {
+      color: #2c3e50;
+    }
+
+    .status-warning {
+      color: #e67e22;
+    }
   </style>
 </head>
 <body>
@@ -129,6 +172,9 @@
   </section>
 
   <main class="chat-container container">
+    <div id="chat-status" class="chat-status">
+      <!-- Status information will be inserted here -->
+    </div>
     <div id="chat-box" class="chat-log">
       <!-- Chat messages will appear here -->
     </div>
@@ -149,6 +195,71 @@
       const chatForm = document.getElementById('chat-form');
       const chatInput = document.getElementById('chat-input');
       const chatBox = document.getElementById('chat-box');
+      const chatStatus = document.getElementById('chat-status');
+      
+      // Check for learning style and diagnostic test status
+      checkStatus();
+      
+      function checkStatus() {
+        const statusMessages = [];
+        
+        // Check for diagnostic test results
+        fetch('/check_diagnostic_status', {
+          method: 'GET'
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (!data.has_diagnostic) {
+            statusMessages.push(`
+              <div class="status-warning">
+                <strong>Tip:</strong> Take a <a href="/diagnostic">diagnostic test</a> for more personalized assistance.
+              </div>
+            `);
+          }
+          
+          // Check for learning style
+          return fetch('/check_learning_style_status', { method: 'GET' });
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.has_learning_style) {
+            const styleDisplay = {
+              'visual': 'Visual',
+              'auditory': 'Auditory',
+              'reading_writing': 'Reading/Writing',
+              'kinesthetic': 'Kinesthetic'
+            };
+            
+            const styleName = styleDisplay[data.learning_style] || data.learning_style;
+            const badgeClass = `badge-${data.learning_style}`;
+            
+            statusMessages.push(`
+              <div class="status-info">
+                <strong>Learning Style:</strong> 
+                <span class="learning-style-badge ${badgeClass}">${styleName}</span>
+                Responses will be tailored to your learning style.
+              </div>
+            `);
+          } else {
+            statusMessages.push(`
+              <div class="status-warning">
+                <strong>Tip:</strong> Take the <a href="/learning_style">learning style assessment</a> for customized learning.
+              </div>
+            `);
+          }
+          
+          // Update status section
+          if (statusMessages.length > 0) {
+            chatStatus.innerHTML = statusMessages.join('');
+            chatStatus.style.display = 'block';
+          } else {
+            chatStatus.style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('Error checking status:', error);
+        });
+      }
       
       // Function to format the bot's response
       function formatBotResponse(text) {
@@ -213,17 +324,36 @@
         // Show typing indicator
         showTypingIndicator();
         
-        // Simulate bot response (in a real app, this would be an API call)
-        setTimeout(() => {
+        // Make real API call to backend
+        fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: message, subject: "General" })
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Hide typing indicator
           hideTypingIndicator();
           
-          // This is where you would normally get the response from your backend
-          // For demo purposes, we'll just echo the message with formatting
-          const botResponse = `Here's what I understood from your message:\n\nYou asked about: **${message}**\n\n*This is a simulated response.*\n\nTry using formatting like:\n- **bold text**\n- *italic text*\n- \`code\`\n\nNew paragraphs are automatically detected.`;
+          if (data.error) {
+            addMessage(`Error: ${data.error}`, false);
+          } else {
+            // Format and add bot response
+            addMessage(formatBotResponse(data.response), false);
+          }
+        })
+        .catch(error => {
+          // Hide typing indicator
+          hideTypingIndicator();
           
-          // Format and add bot response
-          addMessage(formatBotResponse(botResponse), false);
-        }, 1500);
+          console.error('Error:', error);
+          addMessage('Sorry, I encountered an error while processing your request. Please try again.', false);
+        });
       });
       
       // Allow Shift+Enter for new lines, Enter to submit

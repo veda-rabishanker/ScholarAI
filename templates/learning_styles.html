@@ -287,6 +287,40 @@
       to { opacity: 1; transform: translateY(0); }
     }
     
+    /* Loading overlay styles */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.5em;
+      font-weight: bold;
+      z-index: 1000;
+      display: none;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 6px solid rgba(255, 255, 255, 0.3);
+      border-top: 6px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
     /* Responsive adjustments */
     @media (max-width: 900px) {
       .questions-grid {
@@ -642,6 +676,12 @@
     </div>
   </div>
 
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">Processing your learning style...</p>
+  </div>
+
   <footer>
     <div class="container">
       <p>&copy; 2025 Scholar AI. All rights reserved.</p>
@@ -664,6 +704,17 @@
       const green = Math.round(76 + (171 - 76) * (val/100));
       const blue = Math.round(60 - (60 - 182) * (val/100));
       slider.style.background = `rgb(${red}, ${green}, ${blue})`;
+    }
+    
+    // Show loading overlay
+    function showLoading(message) {
+      document.getElementById('loading-text').textContent = message || 'Processing...';
+      document.getElementById('loading-overlay').style.display = 'flex';
+    }
+    
+    // Hide loading overlay
+    function hideLoading() {
+      document.getElementById('loading-overlay').style.display = 'none';
     }
     
     document.getElementById('learning-style-form').addEventListener('submit', function(event) {
@@ -718,6 +769,7 @@
         }
       };
       
+      // Update UI with results
       const result = resultConfig[learnerType];
       document.getElementById("result-style-image").src = result.image;
       document.getElementById("result-style-image").className = `result-image ${result.colorClass}`;
@@ -731,11 +783,64 @@
         <ul>${tipsList}</ul>
       `;
       
-      // Show modal with animation
-      document.getElementById("result-modal").style.display = "flex";
-      setTimeout(() => {
-        document.querySelector(".modal-content").classList.add("animate-in");
-      }, 10);
+      // Convert learning style from display name to backend key
+      const styleMap = {
+        "Visual": "visual",
+        "Auditory": "auditory",
+        "Reading/Writing": "reading_writing",
+        "Kinesthetic": "kinesthetic"
+      };
+      
+      // Prepare API request data
+      const apiData = {
+        visual: scores["Visual"],
+        auditory: scores["Auditory"],
+        reading_writing: scores["Reading/Writing"],
+        kinesthetic: scores["Kinesthetic"]
+      };
+      
+      // Show loading animation
+      showLoading('Saving your learning style...');
+      
+      // Send data to backend
+      fetch('/submit_learning_style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        hideLoading();
+        
+        // Show modal with animation
+        document.getElementById("result-modal").style.display = "flex";
+        setTimeout(() => {
+          document.querySelector(".modal-content").classList.add("animate-in");
+          
+          // Add a button to view detailed results
+          setTimeout(() => {
+            // After showing results, give the option to navigate to results page
+            const viewResultsBtn = document.createElement('button');
+            viewResultsBtn.className = 'submit-btn';
+            viewResultsBtn.style.marginTop = '20px';
+            viewResultsBtn.textContent = 'View Detailed Results';
+            viewResultsBtn.onclick = function() {
+              window.location.href = '/results';
+            };
+            document.querySelector('.result-content').appendChild(viewResultsBtn);
+          }, 1000);
+        }, 10);
+      })
+      .catch(error => {
+        console.error('Error saving learning style:', error);
+        hideLoading();
+        alert('There was an error saving your learning style. Please try again.');
+      });
     });
     
     function closeResultModal() {
@@ -750,6 +855,6 @@
         closeResultModal();
       }
     };
-</script>
+  </script>
 </body>
 </html>
