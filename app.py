@@ -8,6 +8,8 @@ import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List
+import re
+from collections import Counter
 
 import openai
 from flask import Flask, jsonify, render_template, request, session
@@ -30,6 +32,27 @@ app.logger.setLevel(logging.INFO)
 # put api key here 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # --------------------- Helper Functions ---------------------
+
+_STOP = {
+    "the","and","of","to","in","a","for","on","is","are","with","that",
+    "this","an","as","at","by","be","from","has","have","it","its","was",
+    "were","can","could","will","would","should","into","their","they",
+    "them","but","or","if","also","than"
+}
+
+def _keyword_fallback(summary: str, max_q: int = 3) -> list[str]:
+    """
+    Very simple keyword extractor → returns up to *max_q* short
+    search queries when the LLM gives us nothing.
+    """
+    words  = re.findall(r"[A-Za-z]{4,}", summary.lower())
+    counts = Counter(w for w in words if w not in _STOP)
+    top    = [w for w, _ in counts.most_common(6)]           
+    if not top:
+        return []
+    # Turn keywords into “explain <keyword>” queries
+    queries = [f"explain {w}" for w in top[:max_q]]
+    return queries
 
 
 def _read_prompt_template(template_path: str) -> str:
@@ -320,39 +343,61 @@ def generate_test():
 
 @app.route("/submit_test", methods=["POST"])
 def submit_test():
-    answers = request.get_json() or {}
+    """
+    Save the student’s answers, ask GPT‑4 o for a concise strengths/weaknesses
+    summary (no per‑question list), then cache that summary in the session.
+    """
+    answers: Dict[str, str] = request.get_json() or {}
     session["latest_test_answers"] = answers
 
-    # ① immediately wipe the old summary so nothing stale can leak through
-    session["latest_diagnostic_analysis"] = "(pending)"   #  <<< NEW
-    session.modified = True                                #  <<< NEW
+    # clear any previous summary so the UI won’t show stale text
+    session["latest_diagnostic_analysis"] = "(pending)"
+    session.modified = True
 
-    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+    diagnostic_test_text: str = session.get("latest_diagnostic_test", "")
+
+    # ─────────────────── build prompt ───────────────────
+    summary_prompt = (
+        "You are an expert tutor analysing a diagnostic test.\n\n"
+        "Below is the test followed by the student’s answers. "
+        "Using that information, write **only** a concise 3‑4 "
+        "sentence summary describing:\n"
+        " • the student’s strengths\n"
+        " • their weaknesses / misconceptions\n"
+        " • what topics they should focus on next\n\n"
+        "Do **NOT** reproduce the questions, answers, or any ✔️/✖️ list.\n\n"
+        "=== Diagnostic Test ===\n"
+        f"{diagnostic_test_text}\n\n"
+        "=== Student Answers ===\n" +
+        "\n".join(f"{k}: {v}" for k, v in answers.items())
+    )
+
+    app.logger.info("▶ GPT summary prompt is %d chars", len(summary_prompt))
+
     try:
-        if diagnostic_test_text:
-            summary_prompt = (
-                "Below is a diagnostic test followed by the student's answers.\n"
-                "Write a concise 3‑4 sentence summary …"
-            )
-            resp = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": summary_prompt}],
-                temperature=0.5,
-                max_tokens=250,
-            )
-            summary_text = resp.choices[0].message.content.strip() if resp.choices else ""
-        else:
-            summary_text = "Diagnostic summary unavailable (test text missing)."
-    except Exception as e:
-        app.logger.error(f"Diagnostic summary generation failed: {e}")
+        resp = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": summary_prompt}],
+            temperature=0.5,
+            max_tokens=400,
+        )
+        summary_text = (
+            resp.choices[0].message.content.strip()
+            if resp.choices else
+            "Diagnostic summary unavailable – no content returned by OpenAI."
+        )
+    except Exception as exc:
+        app.logger.error("Diagnostic summary generation failed: %s", exc)
         summary_text = "Diagnostic summary unavailable due to an error."
 
-    # ② always — even on failure — store *something* new
+    # store whatever we got so the Results page can display it
     session["latest_diagnostic_analysis"] = summary_text
-    app.logger.info("☑️  latest_diagnostic_analysis set to: %s",
+    app.logger.info("☑️  latest_diagnostic_analysis set (first 120 chars): %s",
                     summary_text[:120])
 
     return jsonify({"status": "ok"})
+
+
 
 
 @app.route("/chat", methods=["POST"])
@@ -510,73 +555,74 @@ def clear_conversation():
 @app.route("/recommend_videos", methods=["POST"])
 def recommend_videos():
     """
-    Return a JSON list of recommended videos.
+    Build YouTube recommendations from the diagnostic summary.
 
-    The payload may include:
-        diagnostic_summary – str
-        learning_style     – str
-    If those are missing we fall back to whatever is in the session.
+    1. Ask GPT‑4o for 3‑5 focussed search queries.
+    2. If GPT comes back empty → fall back to simple keyword extraction.
+    3. Call the YouTube Data API for each query and return a list of videos.
     """
-    payload: Dict[str, Any] = request.get_json(silent=True) or {}
-    diagnostic_summary: str = (
+    payload = request.get_json(silent=True) or {}
+
+    diagnostic_summary = (
         payload.get("diagnostic_summary")
         or session.get("latest_diagnostic_analysis", "")
     )
-    learning_style: str = (
+    learning_style = (
         payload.get("learning_style")
         or session.get("primary_learning_style", "")
     )
 
+    # No context yet?  Front‑end will show a placeholder.
     if not diagnostic_summary:
-        # No context → front‑end shows placeholder
         return jsonify({"videos": []})
 
-    # ───────────────── 1.  Build search queries with GPT ──────────────────
+    # ---------- 1)  LLM → search queries -------------------------------
     prompt_template = _read_prompt_template("topic_prompts/video_topic_prompt.txt")
-    user_prompt = prompt_template.format(
-        weak_areas=diagnostic_summary.strip(),
-        overall_subject="General curriculum",
+    user_prompt     = prompt_template.format(
+        weak_areas      = diagnostic_summary.strip(),
+        overall_subject = "General curriculum",
     )
 
     try:
         app.logger.info("=== Generating search queries for videos ===")
         resp = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+            model       = "gpt-4o",
+            messages    = [
                 {"role": "system", "content": "You are Scholar AI Curator."},
-                {"role": "user", "content": user_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
-            temperature=0.4,
-            max_tokens=200,
+            temperature = 0.4,
+            max_tokens  = 200,
         )
-        raw = resp.choices[0].message.content if resp.choices else "[]"
+        raw     = resp.choices[0].message.content if resp.choices else "[]"
         queries = _safe_json_loads(raw) or []
         if not isinstance(queries, list):
             queries = []
         app.logger.info("‣ GPT search queries → %s", queries)
     except Exception as exc:
-        app.logger.error("LLM failed, fallback to generic query: %s", exc)
+        app.logger.error("LLM failed: %s", exc)
         queries = []
 
-    # ─────── 2.  Use YouTube API —  ────────
-    videos: List[Dict[str, str]] = []
-    seen: set[str] = set()
+    # ---------- 2)  Fallback if GPT came back empty --------------------
+    if not queries:
+        queries = _keyword_fallback(diagnostic_summary)
+        app.logger.info("⚠️  Using keyword‑fallback queries → %s", queries)
 
+    # ---------- 3)  YouTube search ------------------------------------
+    videos, seen = [], set()
     for q in queries:
-        for v in search_videos(q, max_results=5):
-            if v["video_id"] in seen:
+        for vid in search_videos(q, max_results=5):
+            if vid["video_id"] in seen:
                 continue
-            seen.add(v["video_id"])
-            videos.append(v)
-            if len(videos) >= 8:
+            seen.add(vid["video_id"])
+            videos.append(vid)
+            if len(videos) >= 8:           # cap the gallery at 8 videos
                 break
         if len(videos) >= 8:
             break
 
-    # If nothing came back, *just* return an empty list – the UI will say so.
-    app.logger.info("Videos selected: %s", [v["title"] for v in videos])
+    app.logger.info("Videos selected: %s", [v['title'] for v in videos])
     return jsonify({"videos": videos})
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
