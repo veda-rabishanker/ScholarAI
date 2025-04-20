@@ -1,0 +1,11 @@
+# --- web framework & server ---
+Flask==3.0.0           
+Flask-Session==0.8.0   
+gunicorn==21.2.0      
+
+# --- OpenAI & helpers ---
+openai==1.16.1       
+python-dotenv==1.0.1   
+
+# --- HTTP / misc ---
+requests==2.31.0       
