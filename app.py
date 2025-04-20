@@ -1,14 +1,15 @@
 import logging
+import os
+import json
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 import openai
-import os
 
 app = Flask(__name__)
 
 # --------------------- Configuration ---------------------
 
-# Session configuration
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
@@ -16,76 +17,127 @@ Session(app)
 # Force the logger to show INFO level messages
 app.logger.setLevel(logging.INFO)
 
-#put api key here
+# put api key here 
+
+# --------------------- Helper Functions ---------------------
+
+
+def _read_prompt_template(template_path: str) -> str:
+    """
+    Read a prompt template file, guaranteeing the directory exists.
+    """
+    os.makedirs(os.path.dirname(template_path), exist_ok=True)
+    if not os.path.exists(template_path):
+        # create an empty template stub so devs notice
+        with open(template_path, "w") as f:
+            f.write("# prompt template placeholder\n")
+    with open(template_path, "r") as f:
+        return f.read()
+
+
+def _safe_json_loads(text: str):
+    """
+    Attempt to parse a JSON string, returning None if it fails.
+    """
+    try:
+        return json.loads(text)
+    except Exception:
+        return None
+
 
 # --------------------- Routes ---------------------
 
-@app.route('/')
+
+@app.route("/")
 def home():
-    return render_template('index.html')
+    return render_template("index.html")
 
 
-@app.route('/diagnostic')
+@app.route("/diagnostic")
 def diagnostic():
     # Renders the page where users can generate and answer a 10-question diagnostic
-    return render_template('diagnostic.html')
+    return render_template("diagnostic.html")
 
-@app.route('/results')
+
+@app.route("/results")
 def results():
     # Diagnostic results
-    diagnostic_analysis = session.get('latest_diagnostic_analysis', '')
-    test_questions = session.get('latest_diagnostic_test', '')
-    test_answers = session.get('latest_test_answers', {})
-    
-    # Learning style results
-    learning_style_scores = session.get('learning_style_scores', {})
-    learning_interpretation = session.get('learning_style_interpretation', '')
-    primary_style = session.get('primary_learning_style', '')
-    
-    return render_template('results.html',
-                         diagnostic_analysis=diagnostic_analysis,
-                         test_questions=test_questions,
-                         test_answers=test_answers,
-                         learning_scores=learning_style_scores,
-                         learning_interpretation=learning_interpretation,
-                         primary_style=primary_style)
+    diagnostic_analysis = session.get("latest_diagnostic_analysis", "")
+    test_questions = session.get("latest_diagnostic_test", "")
+    test_answers = session.get("latest_test_answers", {})
 
-@app.route('/check_diagnostic_status', methods=['GET'])
+    # Learning style results
+    learning_style_scores = session.get("learning_style_scores", {})
+    learning_interpretation = session.get("learning_style_interpretation", "")
+    primary_style = session.get("primary_learning_style", "")
+
+    return render_template(
+        "results.html",
+        diagnostic_analysis=diagnostic_analysis,
+        test_questions=test_questions,
+        test_answers=test_answers,
+        learning_scores=learning_style_scores,
+        learning_interpretation=learning_interpretation,
+        primary_style=primary_style,
+    )
+
+
+@app.route("/check_diagnostic_status", methods=["GET"])
 def check_diagnostic_status():
     """Check if user has completed a diagnostic test"""
-    has_diagnostic = 'latest_test_answers' in session and session['latest_test_answers']
-    return jsonify({"has_diagnostic": has_diagnostic})
+    has_diagnostic = "latest_test_answers" in session and session["latest_test_answers"]
+    return jsonify({"has_diagnostic": bool(has_diagnostic)})
 
 
-@app.route('/check_learning_style_status', methods=['GET'])
+@app.route("/check_learning_style_status", methods=["GET"])
 def check_learning_style_status():
     """Check if user has completed the learning style assessment"""
-    has_learning_style = 'primary_learning_style' in session and session['primary_learning_style']
-    learning_style = session.get('primary_learning_style', '')
-    return jsonify({
-        "has_learning_style": bool(has_learning_style),
-        "learning_style": learning_style
-    })
+    has_learning_style = (
+        "primary_learning_style" in session and session["primary_learning_style"]
+    )
+    learning_style = session.get("primary_learning_style", "")
+    return jsonify(
+        {"has_learning_style": bool(has_learning_style), "learning_style": learning_style}
+    )
 
-@app.route('/submit_learning_style', methods=['POST'])
+
+@app.route("/get_user_profile", methods=["GET"])
+def get_user_profile():
+    """
+    Provide the front‑end with a lightweight learner profile
+    consisting of diagnostic summary and primary learning style.
+    """
+    diagnostic_summary = session.get("latest_diagnostic_analysis", "")
+    learning_style = session.get("primary_learning_style", "")
+    return jsonify(
+        {
+            "diagnostic_summary": diagnostic_summary,
+            "learning_style": learning_style,
+        }
+    )
+
+
+@app.route("/submit_learning_style", methods=["POST"])
 def submit_learning_style():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data received"}), 400
-    
+
     try:
         # Store raw scores
-        session['learning_style_scores'] = {
-            'visual': data.get('visual', 0),
-            'auditory': data.get('auditory', 0),
-            'reading_writing': data.get('reading_writing', 0),
-            'kinesthetic': data.get('kinesthetic', 0)
+        session["learning_style_scores"] = {
+            "visual": data.get("visual", 0),
+            "auditory": data.get("auditory", 0),
+            "reading_writing": data.get("reading_writing", 0),
+            "kinesthetic": data.get("kinesthetic", 0),
         }
-        
+
         # Determine primary learning style
-        max_score = max(session['learning_style_scores'].values())
-        primary_style = [k for k, v in session['learning_style_scores'].items() if v == max_score][0]
-        
+        max_score = max(session["learning_style_scores"].values())
+        primary_style = [
+            k for k, v in session["learning_style_scores"].items() if v == max_score
+        ][0]
+
         # Generate a detailed interpretation
         interpretation_prompt = (
             f"Student's learning style scores:\n"
@@ -100,113 +152,155 @@ def submit_learning_style():
             "3. Potential challenges and how to overcome them\n"
             "Use simple, clear language suitable for students."
         )
-        
+
         response = openai.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": interpretation_prompt}],
             temperature=0.7,
-            max_tokens=500
+            max_tokens=500,
         )
-        
+
         if response.choices:
-            session['learning_style_interpretation'] = response.choices[0].message.content
-            session['primary_learning_style'] = primary_style
+            session["learning_style_interpretation"] = (
+                response.choices[0].message.content
+            )
+            session["primary_learning_style"] = primary_style
         else:
-            session['learning_style_interpretation'] = "Interpretation unavailable"
-        
-        return jsonify({
-            "status": "success",
-            "primary_style": primary_style,
-            "interpretation": session['learning_style_interpretation']
-        })
-        
+            session["learning_style_interpretation"] = "Interpretation unavailable"
+
+        return jsonify(
+            {
+                "status": "success",
+                "primary_style": primary_style,
+                "interpretation": session["learning_style_interpretation"],
+            }
+        )
+
     except Exception as e:
         app.logger.error(f"Error processing learning style: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/chatbot')
+
+@app.route("/chatbot")
 def chatbot_page():
     # Renders the chatbot page where users can ask questions
-    return render_template('chatbot.html')
+    return render_template("chatbot.html")
 
 
-@app.route('/learning_style')
+@app.route("/learning_style")
 def learning_style():
     # Renders the page for the VARK learning style assessment
-    return render_template('learning_styles.html')
+    return render_template("learning_styles.html")
 
 
-@app.route('/schedule')
+@app.route("/schedule")
 def schedule():
     # Renders the weekly schedule/planner
-    return render_template('schedule.html')
+    return render_template("schedule.html")
 
 
-@app.route('/generate_test', methods=['POST'])
-def generate_test():
+# ---------------- Study Planner (AI calendar) endpoints -----------------
+
+
+@app.route("/generate_study_plan", methods=["POST"])
+def generate_study_plan():
     """
-    Generate a 10-question diagnostic test based on user input:
-      - subject
-      - grade_level
-      - topic
-    Store the generated test in session so we can reference it later.
+    Accepts JSON payload from the intake wizard and returns a
+    JSON study plan produced by the LLM.
     """
     data = request.get_json() or {}
-    subject = data.get('subject', 'General')
-    grade_level = data.get('grade_level', 'Unknown')
-    topic = data.get('topic', '')
+    try:
+        # read & format prompt template
+        template_path = "topic_prompts/study_plan_prompt.txt"
+        template = _read_prompt_template(template_path)
+        filled_prompt = template.format(
+            diagnostic_summary=data.get("diagnostic_summary", ""),
+            learning_style=data.get("learning_style", ""),
+            study_goals=data.get("study_goals", ""),
+            deadlines_json=json.dumps(data.get("deadlines_json", [])),
+            busy_json=json.dumps(data.get("busy_json", {})),
+            free_json=json.dumps(data.get("free_json", {})),
+        )
 
-    # A specialized system prompt for generating a test
+        app.logger.info("=== Generating Study Plan ===")
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are Scholar AI Planner, an expert educational coach.",
+                },
+                {"role": "user", "content": filled_prompt},
+            ],
+            temperature=0.5,
+            max_tokens=1500,
+        )
+
+        if not response.choices:
+            raise RuntimeError("No choices returned from OpenAI")
+
+        raw_plan = response.choices[0].message.content.strip()
+        parsed_plan = _safe_json_loads(raw_plan) or {"raw": raw_plan}
+
+        # unwrap nested plan if LLM wrapped it
+        if isinstance(parsed_plan, dict) and "study_plan" in parsed_plan:
+            parsed_plan = parsed_plan["study_plan"]
+
+        # store a copy so user sees it on refresh
+        session["latest_study_plan"] = parsed_plan
+
+        return jsonify({"study_plan": parsed_plan})
+
+    except Exception as e:
+        app.logger.error(f"Error generating study plan: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------- Existing diagnostic & chat endpoints -----------------
+
+
+@app.route("/generate_test", methods=["POST"])
+def generate_test():
+    """
+    Generate a 10-question diagnostic test based on user input
+    and store it in session for later analysis.
+    """
+    data = request.get_json() or {}
+    subject = data.get("subject", "General")
+    grade_level = data.get("grade_level", "Unknown")
+    topic = data.get("topic", "")
+
     system_prompt = (
         "You are an expert curriculum developer. "
-        "You will create a 10-question diagnostic test for a student, given the subject, grade level, and topic. "
-        "Use a mixture of multiple-choice (with A-D) and short free-response questions. "
+        "Create a 10‑question diagnostic test mixing multiple‑choice (A–D) and short free‑response questions. "
         "Format each question on a new line."
     )
 
-    # The user's request to generate the test
     user_prompt = (
         f"Subject: {subject}\n"
         f"Grade Level: {grade_level}\n"
         f"Topic: {topic}\n\n"
-        "Please create exactly 10 diagnostic questions. At least half should be multiple choice "
-        "with (A), (B), (C), and (D), and the rest can be short free-response questions. "
-        "Use line breaks to separate each question."
+        "Generate exactly 10 diagnostic questions."
     )
 
     try:
         app.logger.info("=== Generating Diagnostic Test ===")
-        app.logger.info(f"System Prompt:\n{system_prompt}")
-        app.logger.info(f"User Prompt:\n{user_prompt}")
-
-        # Call the OpenAI API
         response = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ],
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
         )
 
-        # Log the entire raw response for debugging
-        app.logger.info(f"Raw OpenAI response (generate_test):\n{response}")
-
-        # Safely retrieve the content
-        if not response.choices:
-            app.logger.error("No choices returned from OpenAI in generate_test")
-            diagnostic_test_text = "[No content returned by OpenAI]"
-        else:
-            raw_content = response.choices[0].message.content or ""
-            diagnostic_test_text = raw_content.strip()
-
-        # Store the generated test in session
-        session['latest_diagnostic_test'] = diagnostic_test_text
-
-        app.logger.info("=== Diagnostic Test Generated ===")
-        app.logger.info(diagnostic_test_text)
-
+        diagnostic_test_text = (
+            response.choices[0].message.content.strip()
+            if response.choices
+            else "[No content returned by OpenAI]"
+        )
+        session["latest_diagnostic_test"] = diagnostic_test_text
         return jsonify({"diagnostic_test": diagnostic_test_text})
 
     except Exception as e:
@@ -214,77 +308,93 @@ def generate_test():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/submit_test', methods=['POST'])
+@app.route("/submit_test", methods=["POST"])
 def submit_test():
     """
-    Receive the student's answers for the 10-question test.
-    Store them in session so we can reference them in the chat.
+    Store student's answers in session and create a concise strengths/weaknesses summary
+    so the planner wizard can display it.
     """
     answers = request.get_json() or {}
-    session['latest_test_answers'] = answers
+    session["latest_test_answers"] = answers
 
     app.logger.info("=== Diagnostic Test Answers Submitted ===")
-    app.logger.info(answers)
+
+    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+
+    # ---------------- Generate 3‑4 sentence diagnostic summary ----------------
+    try:
+        if diagnostic_test_text:
+            summary_prompt = (
+                "Below is a diagnostic test followed by the student's answers.\n"
+                "Write a concise 3‑4 sentence summary of overall strengths and weaknesses "
+                "without listing every question.\n\n"
+                f"=== Diagnostic Test ===\n{diagnostic_test_text}\n\n"
+                f"=== Student Answers ===\n{json.dumps(answers, indent=2)}"
+            )
+            resp = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": summary_prompt}],
+                temperature=0.5,
+                max_tokens=250,
+            )
+            summary_text = (
+                resp.choices[0].message.content.strip() if resp.choices else ""
+            )
+        else:
+            summary_text = "Diagnostic summary unavailable (test text missing)."
+    except Exception as e:
+        app.logger.error(f"Diagnostic summary generation failed: {e}")
+        summary_text = "Diagnostic summary unavailable due to an error."
+
+    session["latest_diagnostic_analysis"] = summary_text
 
     return jsonify({"status": "ok"})
 
 
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
     """
-    Primary chatbot endpoint. Sends all context (test + answers + learning style) plus conversation 
-    to the OpenAI model. Then returns the model's reply.
+    Primary chatbot endpoint. Sends diagnostic context + learning style
+    plus conversation to the LLM, then returns the reply.
     """
     data = request.json or {}
-    user_message = data.get('message', '')
-    subject = data.get('subject', 'General Knowledge')
+    user_message = data.get("message", "")
+    subject = data.get("subject", "General Knowledge")
 
-    # Retrieve or create conversation history
-    if 'conversation' not in session:
-        session['conversation'] = []
+    if "conversation" not in session:
+        session["conversation"] = []
 
-    # If there's a new user message, add it
     if user_message:
-        session['conversation'].append({"role": "user", "content": user_message})
+        session["conversation"].append({"role": "user", "content": user_message})
 
-    # Retrieve the stored diagnostic test and answers
-    diagnostic_test_text = session.get('latest_diagnostic_test', '')
-    test_answers = session.get('latest_test_answers', {})
-    
-    # Retrieve learning style information
-    primary_learning_style = session.get('primary_learning_style', '')
-    learning_style_scores = session.get('learning_style_scores', {})
+    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+    test_answers = session.get("latest_test_answers", {})
+    primary_learning_style = session.get("primary_learning_style", "")
+    learning_style_scores = session.get("learning_style_scores", {})
 
-    # Read the initial prompt file but don't modify it
-    text_file_path = 'topic_prompts/initial_prompt.txt'
+    # ---------------- build system message ----------------
+    text_file_path = "topic_prompts/initial_prompt.txt"
     os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
-
-    # If the prompt file doesn't exist, create a minimal prompt
     if not os.path.exists(text_file_path):
-        with open(text_file_path, 'w') as file:
+        with open(text_file_path, "w") as file:
             file.write(
                 "You are Scholar AI, an intelligent tutoring assistant. "
                 "Evaluate the student's diagnostic test answers below, identify correctness or mistakes, "
                 "and provide detailed feedback and next steps.\n"
             )
 
-    # Read the file contents but don't append to it
-    with open(text_file_path, 'r') as file:
+    with open(text_file_path, "r") as file:
         initial_prompt = file.read()
 
-    # Add current subject context
-    system_content = initial_prompt + f"\n\nStudent has chosen the subject: {subject}\n\n"
-    
-    # Add instructions for automatic context recognition
-    system_content += (
+    system_content = (
+        initial_prompt + f"\n\nStudent has chosen the subject: {subject}\n\n"
         "IMPORTANT: When a user first messages you or asks for help studying, "
         "DO NOT ask generic questions about what subject they want to study. "
         "Instead, immediately use the diagnostic test results and learning style information "
         "provided below to offer personalized guidance. Assume they want help with the "
         "material covered in their diagnostic test unless they specifically ask for something else.\n\n"
     )
-    
-    # Add diagnostic test information if available
+
     if diagnostic_test_text and test_answers:
         system_content += "=== Diagnostic Test ===\n"
         system_content += diagnostic_test_text + "\n\n"
@@ -292,8 +402,7 @@ def chat():
         for key, val in test_answers.items():
             system_content += f"{key}: {val}\n"
         system_content += "\n"
-    
-    # Add learning style information if available
+
     if primary_learning_style:
         system_content += "=== Student's Learning Style ===\n"
         system_content += f"Primary Learning Style: {primary_learning_style}\n"
@@ -302,39 +411,32 @@ def chat():
             for style, score in learning_style_scores.items():
                 system_content += f"- {style}: {score}\n"
         system_content += "\n"
-        system_content += (
-            f"The student has a {primary_learning_style} learning preference. "
-            f"Please tailor your explanations and suggestions accordingly. "
-            f"For this learning style, you should emphasize:\n"
-        )
-        
-        # Add specific guidance based on learning style
-        if primary_learning_style == 'visual':
+
+        if primary_learning_style == "visual":
             system_content += (
                 "- Use diagrams, charts, and images in explanations\n"
                 "- Suggest visual study aids like mind maps and color coding\n"
                 "- Describe concepts with visual metaphors and spatial relationships\n"
             )
-        elif primary_learning_style == 'auditory':
+        elif primary_learning_style == "auditory":
             system_content += (
                 "- Explain concepts as if speaking them aloud\n"
                 "- Suggest verbal repetition and discussion-based learning\n"
                 "- Recommend audio recordings and verbal mnemonics\n"
             )
-        elif primary_learning_style == 'reading_writing':
+        elif primary_learning_style == "reading_writing":
             system_content += (
                 "- Structure information in written format with lists and paragraphs\n"
                 "- Suggest note-taking and written summaries as study techniques\n"
                 "- Emphasize the importance of text-based learning resources\n"
             )
-        elif primary_learning_style == 'kinesthetic':
+        elif primary_learning_style == "kinesthetic":
             system_content += (
                 "- Relate concepts to physical experiences and real-world applications\n"
                 "- Suggest hands-on activities and practice-based learning\n"
                 "- Recommend movement and physical interaction while studying\n"
             )
-    
-    # Add instructions for response
+
     if diagnostic_test_text and test_answers:
         system_content += (
             "ALWAYS start by analyzing the diagnostic test results when the conversation begins "
@@ -342,35 +444,26 @@ def chat():
             "identify which ones are wrong, explain the correct solutions, and offer "
             "next steps or study tips tailored to their learning style.\n"
         )
-    
+
     system_content += "If the user has other questions, do your best to help using the context.\n"
 
-    # Construct messages for the model - use the system message
-    messages = [
-        {"role": "system", "content": system_content}
-    ] + session['conversation']
+    messages = [{"role": "system", "content": system_content}] + session["conversation"]
 
     app.logger.info("=== Chat Endpoint Called ===")
     app.logger.info(f"System message length: {len(system_content)} characters")
 
     try:
-        # If this is the first message from the user and we have diagnostic data,
-        # add an instruction to analyze test results right away
-        if len(session['conversation']) <= 1 and diagnostic_test_text and test_answers:
+        if len(session["conversation"]) <= 1 and diagnostic_test_text and test_answers:
             first_time_instruction = {
-                "role": "user", 
-                "content": "Please analyze my diagnostic test results and provide feedback."
+                "role": "user",
+                "content": "Please analyze my diagnostic test results and provide feedback.",
             }
-            messages.insert(1, first_time_instruction)  # Insert after system but before user message
-        
-        # Send the conversation to OpenAI
+            messages.insert(1, first_time_instruction)
+
         response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.7
+            model="gpt-4o", messages=messages, temperature=0.7
         )
-        
-        # Safely extract the AI's reply
+
         if not response.choices:
             app.logger.error("No choices returned from OpenAI in chat")
             gpt_response = "[No content returned by OpenAI]"
@@ -378,38 +471,38 @@ def chat():
             raw_content = response.choices[0].message.content or ""
             gpt_response = raw_content.strip()
 
-        # Add the AI's reply to the conversation
-        session['conversation'].append({"role": "assistant", "content": gpt_response})
+        session["conversation"].append({"role": "assistant", "content": gpt_response})
 
-        # Log the final GPT response
         app.logger.info("=== OpenAI Chat Response ===")
         app.logger.info(gpt_response)
 
-        return jsonify({'response': gpt_response})
+        return jsonify({"response": gpt_response})
 
     except Exception as e:
         app.logger.error(f"An error occurred in /chat: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route('/clear_session', methods=['GET'])
+# ---------------- Utilities ----------------
+
+
+@app.route("/clear_session", methods=["GET"])
 def clear_session():
     """
     Simple endpoint to clear the session for a fresh start.
     """
     session.clear()
-    return jsonify({'status': 'session cleared'})
+    return jsonify({"status": "session cleared"})
 
 
-@app.route('/clear_conversation', methods=['POST'])
+@app.route("/clear_conversation", methods=["POST"])
 def clear_conversation():
     """
     Clear only the conversation history but keep diagnostic and learning style data
     """
-    # Only clear conversation history
-    session['conversation'] = []
-    return jsonify({'status': 'conversation cleared, data preserved'})
+    session["conversation"] = []
+    return jsonify({"status": "conversation cleared, data preserved"})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

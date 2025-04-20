@@ -278,3 +278,52 @@ form button:hover {
 .dropdown-content {
   padding: 5px 0;
 }
+
+/* ================================================================== */
+/* ===  New styles for Study Planner wizard & calendar (non‑breaking) */
+.wizard-box{
+  background:#ffffff;
+  padding:25px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  margin:30px 0;
+}
+.btn-primary{
+  background:#3498db;
+  color:#fff;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  transition:background 0.3s;
+}
+.btn-primary:hover{background:#2980b9;}
+.btn-secondary{
+  background:#95a5a6;
+  color:#fff;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  transition:background 0.3s;
+}
+.btn-secondary:hover{background:#7f8c8d;}
+.session-block{
+  background:#3498db;
+  color:#fff;
+  font-size:11px;
+  padding:2px 4px;
+  border-radius:3px;
+  margin-bottom:2px;
+  display:block;
+}
+.test-block{
+  background:#2ecc71;
+  color:#fff;
+  font-size:11px;
+  padding:2px 4px;
+  border-radius:3px;
+  margin-bottom:2px;
+  display:block;
+}
+/* ================================================================== */
