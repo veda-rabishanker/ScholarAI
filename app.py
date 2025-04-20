@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv 
+load_dotenv()      
+
 import json
 import logging
 import os
@@ -25,7 +28,7 @@ Session(app)
 app.logger.setLevel(logging.INFO)
 
 # put api key here 
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 # --------------------- Helper Functions ---------------------
 
 

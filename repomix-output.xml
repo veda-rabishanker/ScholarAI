@@ -43,6 +43,8 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+services/
+  youtube.py
 static/
   chat.css
   chat.js
@@ -50,6 +52,7 @@ static/
   plan_intake.js
   script.js
   styles.css
+  video_recs.js
 templates/
   chatbot.html
   diagnostic.html
@@ -61,7 +64,9 @@ topic_prompts/
   diagnostic_test.txt
   initial_prompt.txt
   study_plan_prompt.txt
+  video_topic_prompt.txt
 .gitignore
+app.py
 c2cbot.code-workspace
 diagnostic_test.txt
 pyproject.toml
@@ -70,6 +75,89 @@ README.md
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="services/youtube.py">
+"""wrapper around the YouTube Data API v3 for fetching educational
+video metadata. Designed to be called by /recommend_videos.
+
+Public function:
+    search_videos(query: str, max_results: int = 5) -> list[dict]
+        Returns a list of { video_id, title, channel, thumbnail }.
+"""
+from __future__ import annotations
+
+import logging
+from typing import List, Dict
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+_API_KEY = "AIzaSyArXgygP12FK7W9bN4JJagnEIeRTMZ0sxk"
+_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+
+if not _API_KEY:
+    logger.warning("YOUTUBE_API_KEY is not set – YouTube searches will fail.")
+
+
+def _build_params(query: str, max_results: int) -> dict:
+    """Build query parameters for the search endpoint."""
+    return {
+        "part"       : "snippet",
+        "q"          : query,
+        "type"       : "video",
+        "maxResults" : max_results,
+        "safeSearch" : "moderate",   # ← relaxed from "strict"
+        "key"        : _API_KEY,
+    }
+
+
+def search_videos(query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """Search YouTube for *query* and return a simplified list of results.
+
+    If the API key is missing or an HTTP error occurs, an empty list is
+    returned and the issue is logged (so /recommend_videos can degrade
+    gracefully rather than crashing).
+    """
+    if not _API_KEY:
+        return []
+
+    try:
+        resp = requests.get(
+            _SEARCH_URL,
+            params=_build_params(query, max_results),
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:  # network / JSON / HTTP errors
+        logger.error("YouTube API call failed: %s", exc)
+        return []
+
+    results: List[Dict[str, str]] = []
+    for item in data.get("items", []):
+        vid = item.get("id", {}).get("videoId")
+        if not vid:
+            continue
+        snippet = item.get("snippet", {})
+        results.append(
+            {
+                "video_id" : vid,
+                "title"    : snippet.get("title", "(no title)")[:120],
+                "channel"  : snippet.get("channelTitle", ""),
+                "thumbnail": (
+                    snippet.get("thumbnails", {})
+                           .get("high", {})
+                           .get("url")
+                    or snippet.get("thumbnails", {})
+                              .get("default", {})
+                              .get("url", "")
+                ),
+            }
+        )
+
+    return results
+</file>
 
 <file path="static/chat.js">
 document.addEventListener('DOMContentLoaded', () => {
@@ -603,316 +691,166 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 </file>
 
-<file path="templates/results.html">
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scholar AI - Results</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-  <style>
-    /* Results Page Styles */
-    .results-section {
-      background: #f9f9f9;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 30px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+<file path="static/video_recs.js">
+console.log("__VERSION 6  ::  video_recs.js loaded");
+
+// ────────────────────────────────────────────────────────────
+// Mounts on <div id="video-recs-root"> and handles:
+//  • POST → /recommend_videos with diagnostic_summary + learning_style
+//  • Skeleton loader while waiting
+//  • Responsive gallery of video cards (thumbnail + title + channel)
+//  • In‑page playback with Back button
+//  • "Refresh Videos" button pulls the latest diagnostic summary first
+// ────────────────────────────────────────────────────────────
+(() => {
+  /* ────────── bootstrap ────────── */
+  const mount = document.getElementById("video-recs-root");
+  if (!mount) return;                         // not on Results page
+
+  const state = {
+    videos: [],
+    lastPayload: {
+      diagnostic_summary: mount.dataset.diagnosticSummary || "",
+      learning_style    : mount.dataset.learningStyle     || ""
+    }
+  };
+
+  renderIntro();
+
+  /* ────────── UI helpers ────────── */
+
+  function renderIntro() {
+    mount.innerHTML = "";
+    if (!state.lastPayload.diagnostic_summary.trim()) {
+      mount.innerHTML =
+        `<p>Complete a diagnostic test to unlock personalised video recommendations.</p>`;
+      return;
+    }
+    const btn = document.createElement("button");
+    btn.className = "btn";
+    btn.textContent = "Load Recommended Videos";
+    btn.onclick    = loadVideos;
+    mount.appendChild(btn);
+  }
+
+  function renderSkeleton() {
+    mount.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.className = "video-container";
+    for (let i = 0; i < 6; i++) {
+      const card = document.createElement("div");
+      card.className = "video-card";
+      card.style =
+        "background:#ececec;height:180px;border:none;animation:pulse 1.5s ease-in-out infinite;";
+      wrap.appendChild(card);
+    }
+    mount.appendChild(wrap);
+
+    if (!document.getElementById("pulse-anim")) {
+      const style = document.createElement("style");
+      style.id = "pulse-anim";
+      style.textContent =
+        "@keyframes pulse{0%{opacity:.7;}50%{opacity:.4;}100%{opacity:.7;}}";
+      document.head.appendChild(style);
+    }
+  }
+
+  function renderGrid() {
+    mount.innerHTML = "";
+
+    // Refresh button
+    const refresh = document.createElement("button");
+    refresh.className = "btn";
+    refresh.textContent = "Refresh Videos";
+    refresh.onclick    = loadVideos;      // loadVideos already updates summary
+    mount.appendChild(refresh);
+
+    if (!state.videos.length) {
+      mount.insertAdjacentHTML(
+        "beforeend",
+        `<p id="no-videos-message">No videos found for your diagnostic profile.</p>`
+      );
+      return;
     }
 
-    .results-section h3 {
-      color: #2c3e50;
-      margin-top: 0;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-    }
-
-    #progress-chart {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 20px;
-      min-height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .placeholder {
-      color: #999;
-      font-style: italic;
-    }
-
-    .btn {
-      display: inline-block;
-      background: #3498db;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 4px;
-      text-decoration: none;
-      margin-top: 10px;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      background: #2980b9;
-    }
-
-    /* Video Section Styles */
-    .video-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-    
-    .video-card {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      transition: transform 0.3s;
-    }
-    
-    .video-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .video-thumbnail {
-      position: relative;
-      padding-bottom: 56.25%; /* 16:9 aspect ratio */
-      cursor: pointer;
-    }
-    
-    .video-thumbnail img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .video-info {
-      padding: 15px;
-    }
-    
-    .video-info h4 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-    }
-    
-    .video-info p {
-      margin: 5px 0;
-      font-size: 14px;
-      color: #666;
-    }
-    
-    .embedded-video {
-      width: 100%;
-      aspect-ratio: 16/9;
-      margin-bottom: 20px;
-      border: none;
-    }
-
-    #video-search-form {
-      margin: 20px 0;
-    }
-
-    #no-videos-message {
-      color: #666;
-      font-style: italic;
-    }
-  </style>
-  <script defer src="{{ url_for('static', filename='script.js') }}"></script>
-</head>
-<body>
-  <header>
-    <div class="container">
-      <h1>Scholar AI</h1>
-      <nav>
-        <ul>
-          <li><a href="/">Home</a></li>
-          <li class="dropdown">
-            <a href="javascript:void(0)" class="dropbtn">Tests</a>
-            <div class="dropdown-content">
-              <a href="/diagnostic">Diagnostic Test</a>
-              <a href="/learning_style">Learning Style</a>
-            </div>
-          </li>
-          <li><a href="/chatbot">Chatbot</a></li>
-          <li><a href="/schedule">Schedule</a></li>
-          <li><a href="/results">Results</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
-
-  <section id="results" class="results">
-    <div class="container">
-      <h2>Your Results</h2>
-      
-      <!-- Diagnostic Test Results Section -->
-      <div id="diagnostic-results" class="results-section">
-        <h3>Diagnostic Test Performance</h3>
-        <div id="test-results-content">
-          {% if diagnostic_results %}
-            <p>{{ diagnostic_results }}</p>
-          {% else %}
-            <p>No diagnostic test results available. Complete a diagnostic test to see your results.</p>
-            <a href="/diagnostic" class="btn">Take Diagnostic Test</a>
-          {% endif %}
+    const grid = document.createElement("div");
+    grid.className = "video-container";
+    state.videos.forEach(v => {
+      const card = document.createElement("div");
+      card.className = "video-card";
+      card.innerHTML = `
+        <div class="video-thumbnail">
+          <img src="${v.thumbnail}" alt="${v.title}">
         </div>
-      </div>
-      
-      <!-- Learning Style Results Section -->
-      <div id="learning-style-results" class="results-section">
-        <h3>Learning Style Assessment</h3>
-        <div id="learning-style-content">
-          {% if learning_style_results %}
-            <p>{{ learning_style_results }}</p>
-          {% else %}
-            <p>No learning style assessment completed. Take the assessment to discover your preferred learning style.</p>
-            <a href="/learning_style" class="btn">Take Learning Style Assessment</a>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Educational Videos Section -->
-      <div id="educational-videos" class="results-section">
-        <h3>Recommended Educational Videos</h3>
-        
-        <!-- Video search form (hidden when videos are shown) -->
-        <div id="video-search-form" {% if not test_answers.topic %}style="display: none;"{% endif %}>
-          <input type="hidden" id="video-topic" value="{{ test_answers.topic if test_answers else '' }}">
-          <button id="find-videos-btn" class="btn">Find Related Videos</button>
-        </div>
-        
-        <!-- Video results container -->
-        <div id="video-results-container" class="video-container">
-          <!-- Videos will be loaded here -->
-          <p id="no-videos-message">No videos loaded yet. {% if test_answers.topic %}Click "Find Related Videos" to see recommendations.{% else %}Complete a diagnostic test to get video recommendations.{% endif %}</p>
-        </div>
-      </div>
-      
-      <!-- Progress Tracking Section -->
-      <div id="progress-tracking" class="results-section">
-        <h3>Progress Over Time</h3>
-        <div id="progress-content">
-          <p>Your progress tracking will appear here after multiple assessments.</p>
-          <div id="progress-chart">
-            <!-- This could be replaced with a chart from Chart.js or similar -->
-            <p class="placeholder">Progress chart will be displayed here</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <div class="container">
-      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
-    </div>
-  </footer>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const videoTopic = document.getElementById('video-topic')?.value;
-      const findVideosBtn = document.getElementById('find-videos-btn');
-      
-      // Handle video search
-      findVideosBtn?.addEventListener('click', function() {
-        if (!videoTopic) return;
-        
-        this.disabled = true;
-        this.textContent = 'Loading...';
-        document.getElementById('no-videos-message').textContent = 'Searching for videos...';
-        
-        fetch('/search_videos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: videoTopic + ' educational' })
-        })
-        .then(response => {
-          if (!response.ok) throw new Error('Network response was not ok');
-          return response.json();
-        })
-        .then(data => {
-          displayVideos(data.videos || []);
-          findVideosBtn.textContent = 'Refresh Videos';
-          findVideosBtn.disabled = false;
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          document.getElementById('no-videos-message').textContent = 'Failed to load videos. Please try again later.';
-          findVideosBtn.textContent = 'Try Again';
-          findVideosBtn.disabled = false;
-        });
-      });
-      
-      function displayVideos(videos) {
-        const container = document.getElementById('video-results-container');
-        
-        if (!videos || videos.length === 0) {
-          container.innerHTML = '<p id="no-videos-message">No videos found for this topic.</p>';
-          return;
-        }
-        
-        container.innerHTML = '';
-        
-        videos.forEach(video => {
-          const videoCard = document.createElement('div');
-          videoCard.className = 'video-card';
-          
-          videoCard.innerHTML = `
-            <div class="video-thumbnail" onclick="embedVideo('${video.video_id}', this)">
-              <img src="${video.thumbnail}" alt="${video.title}">
-            </div>
-            <div class="video-info">
-              <h4>${video.title}</h4>
-              <p>Channel: ${video.channel}</p>
-            </div>
-          `;
-          
-          container.appendChild(videoCard);
-        });
-      }
-      
-      // Make embedVideo function available globally
-      window.embedVideo = function(videoId, clickedElement) {
-        const container = document.getElementById('video-results-container');
-        
-        // Create back button
-        const backButton = document.createElement('button');
-        backButton.className = 'btn';
-        backButton.textContent = 'Back to Videos';
-        backButton.onclick = function() {
-          // Trigger the video search again to show all videos
-          document.getElementById('find-videos-btn').click();
-        };
-        
-        // Create video iframe
-        const videoIframe = document.createElement('iframe');
-        videoIframe.className = 'embedded-video';
-        videoIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-        videoIframe.setAttribute('frameborder', '0');
-        videoIframe.setAttribute('allowfullscreen', '');
-        videoIframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
-        
-        // Clear container and add new elements
-        container.innerHTML = '';
-        container.appendChild(backButton);
-        container.appendChild(videoIframe);
-        
-        // Scroll to video section
-        document.getElementById('educational-videos').scrollIntoView({ behavior: 'smooth' });
-      };
+        <div class="video-info">
+          <h4>${v.title}</h4>
+          <p>Channel: ${v.channel}</p>
+        </div>`;
+      card.querySelector(".video-thumbnail").onclick = () => renderEmbed(v);
+      grid.appendChild(card);
     });
-  </script>
-</body>
-</html>
+    mount.appendChild(grid);
+  }
+
+  function renderEmbed(video) {
+    mount.innerHTML = "";
+
+    const back = document.createElement("button");
+    back.className = "btn";
+    back.textContent = "Back to Videos";
+    back.onclick     = renderGrid;
+    mount.appendChild(back);
+
+    const iframe = document.createElement("iframe");
+    iframe.className      = "embedded-video";
+    iframe.src            = `https://www.youtube.com/embed/${video.video_id}?autoplay=1`;
+    iframe.allow          = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+    iframe.frameBorder    = "0";
+    mount.appendChild(iframe);
+
+    mount.scrollIntoView({ behavior: "smooth" });
+  }
+
+  /* ────────── data helpers ────────── */
+
+  // ALWAYS adopt whatever the server returns (even an empty string)
+  async function updateDiagnosticSummary() {
+    try {
+      const profile = await fetch("/get_user_profile").then(r => r.json());
+      state.lastPayload.diagnostic_summary = profile.diagnostic_summary ?? "";
+      console.log("🔄 diagnostic_summary now:",
+                  state.lastPayload.diagnostic_summary.slice(0, 60) || "(empty)");
+    } catch (e) {
+      console.warn("Could not refresh diagnostic summary:", e);
+    }
+  }
+
+  /* ────────── main fetch routine ────────── */
+
+  async function loadVideos () {
+    await updateDiagnosticSummary();           // always latest
+    console.log("📦 Final payload:", state.lastPayload);
+
+    renderSkeleton();
+    fetch(`/recommend_videos?ts=${Date.now()}`, {   // cache‑bust
+      method : "POST",
+      headers: { "Content-Type": "application/json" },
+      body   : JSON.stringify(state.lastPayload)
+    })
+    .then(r => r.ok ? r.json() : Promise.reject(r))
+    .then(data => {
+      console.log("◀ /recommend_videos →", data.videos?.map(v => v.title));
+      state.videos = Array.isArray(data.videos) ? data.videos : [];
+      renderGrid();
+    })
+    .catch(err => {
+      console.error("/recommend_videos error:", err);
+      mount.innerHTML =
+        `<p style="color:#c0392b;">Failed to load videos. Please try again later.</p>`;
+    });
+  }
+})();
 </file>
 
 <file path="topic_prompts/diagnostic_test.txt">
@@ -944,6 +882,18 @@ Guidelines:
 • Final 24 h pre‑test = recap only.  
 
 Output **only JSON**, never prose.
+</file>
+
+<file path="topic_prompts/video_topic_prompt.txt">
+System
+You are Scholar AI Curator, an expert at mapping student weaknesses to precise YouTube search queries.
+
+User
+Diagnostic weaknesses: {weak_areas}
+Overall topic: {overall_subject}
+
+Return 3–5 concise search queries (≤ 6 words each) that would surface the best educational videos for this learner.
+Output JSON array only – no prose.
 </file>
 
 <file path=".gitignore">
@@ -997,6 +947,126 @@ build-backend = "poetry.core.masonry.api"
 
 <file path="README.md">
 # ScholarAI
+</file>
+
+<file path="templates/results.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scholar AI – Results</title>
+
+  <!-- global stylesheet & helpers -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
+  <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+
+  <style>
+    /* ────────── page‑specific tweaks ────────── */
+    .results-section{background:#f9f9f9;border-radius:8px;padding:20px;margin-bottom:30px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .results-section h3{color:#2c3e50;margin-top:0;border-bottom:1px solid #eee;padding-bottom:10px;}
+    #progress-chart{background:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;min-height:200px;display:flex;align-items:center;justify-content:center;}
+    .placeholder{color:#999;font-style:italic;}
+
+    /* video gallery – reused by video_recs.js */
+    .video-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:20px;}
+    .video-card{border:1px solid #ddd;border-radius:8px;overflow:hidden;transition:transform .3s;}
+    .video-card:hover{transform:translateY(-5px);box-shadow:0 5px 15px rgba(0,0,0,.1);}
+    .video-thumbnail{position:relative;padding-bottom:56.25%;cursor:pointer;}
+    .video-thumbnail img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+    .video-info{padding:15px;}
+    .video-info h4{margin:0 0 10px;font-size:16px;}
+    .video-info p{margin:5px 0;font-size:14px;color:#666;}
+    .embedded-video{width:100%;aspect-ratio:16/9;margin-bottom:20px;border:none;}
+    .btn{display:inline-block;background:#3498db;color:#fff;padding:10px 15px;border-radius:4px;text-decoration:none;margin-top:10px;border:none;cursor:pointer;}
+    .btn:hover{background:#2980b9;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <h1>Scholar AI</h1>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li class="dropdown">
+          <a href="javascript:void(0)" class="dropbtn">Tests</a>
+          <div class="dropdown-content">
+            <a href="/diagnostic">Diagnostic Test</a>
+            <a href="/learning_style">Learning Style</a>
+          </div>
+        </li>
+        <li><a href="/chatbot">Chatbot</a></li>
+        <li><a href="/schedule">Schedule</a></li>
+        <li><a href="/results">Results</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section id="results" class="results">
+  <div class="container">
+    <h2>Your Results</h2>
+
+    <!-- Diagnostic Performance -->
+    <!-- DEBUG‑DIAG: {{ diagnostic_analysis|default('EMPTY')|truncate(60) }} -->
+    <div id="diagnostic-results" class="results-section">
+      <h3>Diagnostic Test Performance</h3>
+      <div id="test-results-content">
+        {% if diagnostic_analysis %}
+          <p>{{ diagnostic_analysis }}</p>
+        {% else %}
+          <p>No diagnostic test results available. Complete a diagnostic test to see your results.</p>
+          <a href="/diagnostic" class="btn">Take Diagnostic Test</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Learning‑style -->
+    <div id="learning-style-results" class="results-section">
+      <h3>Learning Style Assessment</h3>
+      <div id="learning-style-content">
+        {% if learning_interpretation %}
+          <p>{{ learning_interpretation }}</p>
+        {% else %}
+          <p>No learning style assessment completed. Take the assessment to discover your preferred learning style.</p>
+          <a href="/learning_style" class="btn">Take Learning Style Assessment</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Recommended videos -->
+    <div id="educational-videos" class="results-section">
+      <h3>Recommended Educational Videos</h3>
+      <div id="video-recs-root"
+           data-diagnostic-summary="{{ diagnostic_analysis|default('', true) }}"
+           data-learning-style="{{ primary_style|default('', true) }}"></div>
+    </div>
+
+    <!-- Progress tracking -->
+    <div id="progress-tracking" class="results-section">
+      <h3>Progress Over Time</h3>
+      <div id="progress-content">
+        <p>Your progress tracking will appear here after multiple assessments.</p>
+        <div id="progress-chart">
+          <p class="placeholder">Progress chart will be displayed here</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+  </div>
+</footer>
+
+<!-- modular bundle powering the video recommendations (cache‑busted) -->
+<script type="module" defer
+        src="{{ url_for('static', filename='video_recs.js') }}?v=5"></script>
+</body>
+</html>
 </file>
 
 <file path="static/chat.css">
@@ -3183,6 +3253,587 @@ Behavioral Guidelines:
   </footer>
 </body>
 </html>
+</file>
+
+<file path="app.py">
+from __future__ import annotations
+
+import json
+import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List
+
+import openai
+from flask import Flask, jsonify, render_template, request, session
+from flask_session import Session
+
+
+from services.youtube import search_videos
+
+app = Flask(__name__)
+
+# --------------------- Configuration ---------------------
+
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+# Force the logger to show INFO level messages
+app.logger.setLevel(logging.INFO)
+
+# put api key here 
+# --------------------- Helper Functions ---------------------
+
+
+def _read_prompt_template(template_path: str) -> str:
+    """
+    Read a prompt template file, guaranteeing the directory exists.
+    """
+    os.makedirs(os.path.dirname(template_path), exist_ok=True)
+    if not os.path.exists(template_path):
+        # create an empty template stub so devs notice
+        with open(template_path, "w") as f:
+            f.write("# prompt template placeholder\n")
+    with open(template_path, "r") as f:
+        return f.read()
+
+
+def _safe_json_loads(text: str):
+    """
+    Attempt to parse a JSON string, returning None if it fails.
+    """
+    try:
+        return json.loads(text)
+    except Exception:
+        return None
+
+
+# --------------------- Routes ---------------------
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/diagnostic")
+def diagnostic():
+    # Renders the page where users can generate and answer a 10-question diagnostic
+    return render_template("diagnostic.html")
+
+
+@app.route("/results")
+def results():
+    # Diagnostic results
+    diagnostic_analysis = session.get("latest_diagnostic_analysis", "")
+    test_questions = session.get("latest_diagnostic_test", "")
+    test_answers = session.get("latest_test_answers", {})
+
+    # Learning style results
+    learning_style_scores = session.get("learning_style_scores", {})
+    learning_interpretation = session.get("learning_style_interpretation", "")
+    primary_style = session.get("primary_learning_style", "")
+
+    return render_template(
+        "results.html",
+        diagnostic_analysis=diagnostic_analysis,
+        test_questions=test_questions,
+        test_answers=test_answers,
+        learning_scores=learning_style_scores,
+        learning_interpretation=learning_interpretation,
+        primary_style=primary_style,
+    )
+
+
+@app.route("/check_diagnostic_status", methods=["GET"])
+def check_diagnostic_status():
+    """Check if user has completed a diagnostic test"""
+    has_diagnostic = "latest_test_answers" in session and session["latest_test_answers"]
+    return jsonify({"has_diagnostic": bool(has_diagnostic)})
+
+
+@app.route("/check_learning_style_status", methods=["GET"])
+def check_learning_style_status():
+    """Check if user has completed the learning style assessment"""
+    has_learning_style = (
+        "primary_learning_style" in session and session["primary_learning_style"]
+    )
+    learning_style = session.get("primary_learning_style", "")
+    return jsonify(
+        {"has_learning_style": bool(has_learning_style), "learning_style": learning_style}
+    )
+
+
+@app.route("/get_user_profile", methods=["GET"])
+def get_user_profile():
+    """
+    Provide the front‑end with a lightweight learner profile
+    consisting of diagnostic summary and primary learning style.
+    """
+    diagnostic_summary = session.get("latest_diagnostic_analysis", "")
+    learning_style = session.get("primary_learning_style", "")
+    return jsonify(
+        {
+            "diagnostic_summary": diagnostic_summary,
+            "learning_style": learning_style,
+        }
+    )
+
+
+@app.route("/submit_learning_style", methods=["POST"])
+def submit_learning_style():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data received"}), 400
+
+    try:
+        # Store raw scores
+        session["learning_style_scores"] = {
+            "visual": data.get("visual", 0),
+            "auditory": data.get("auditory", 0),
+            "reading_writing": data.get("reading_writing", 0),
+            "kinesthetic": data.get("kinesthetic", 0),
+        }
+
+        # Determine primary learning style
+        max_score = max(session["learning_style_scores"].values())
+        primary_style = [
+            k for k, v in session["learning_style_scores"].items() if v == max_score
+        ][0]
+
+        # Generate a detailed interpretation
+        interpretation_prompt = (
+            f"Student's learning style scores:\n"
+            f"Visual: {session['learning_style_scores']['visual']}\n"
+            f"Auditory: {session['learning_style_scores']['auditory']}\n"
+            f"Reading/Writing: {session['learning_style_scores']['reading_writing']}\n"
+            f"Kinesthetic: {session['learning_style_scores']['kinesthetic']}\n\n"
+            f"The primary learning style is {primary_style}.\n"
+            "Provide a 3-4 paragraph interpretation of these results, including:\n"
+            "1. What this learning style means\n"
+            "2. Study strategies that would be effective\n"
+            "3. Potential challenges and how to overcome them\n"
+            "Use simple, clear language suitable for students."
+        )
+
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": interpretation_prompt}],
+            temperature=0.7,
+            max_tokens=500,
+        )
+
+        if response.choices:
+            session["learning_style_interpretation"] = (
+                response.choices[0].message.content
+            )
+            session["primary_learning_style"] = primary_style
+        else:
+            session["learning_style_interpretation"] = "Interpretation unavailable"
+
+        return jsonify(
+            {
+                "status": "success",
+                "primary_style": primary_style,
+                "interpretation": session["learning_style_interpretation"],
+            }
+        )
+
+    except Exception as e:
+        app.logger.error(f"Error processing learning style: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chatbot")
+def chatbot_page():
+    # Renders the chatbot page where users can ask questions
+    return render_template("chatbot.html")
+
+
+@app.route("/learning_style")
+def learning_style():
+    # Renders the page for the VARK learning style assessment
+    return render_template("learning_styles.html")
+
+
+@app.route("/schedule")
+def schedule():
+    # Renders the weekly schedule/planner
+    return render_template("schedule.html")
+
+
+# ---------------- Study Planner (AI calendar) endpoints -----------------
+
+
+@app.route("/generate_study_plan", methods=["POST"])
+def generate_study_plan():
+    """
+    Accepts JSON payload from the intake wizard and returns a
+    JSON study plan produced by the LLM.
+    """
+    data = request.get_json() or {}
+    try:
+        # read & format prompt template
+        template_path = "topic_prompts/study_plan_prompt.txt"
+        template = _read_prompt_template(template_path)
+        filled_prompt = template.format(
+            diagnostic_summary=data.get("diagnostic_summary", ""),
+            learning_style=data.get("learning_style", ""),
+            study_goals=data.get("study_goals", ""),
+            deadlines_json=json.dumps(data.get("deadlines_json", [])),
+            busy_json=json.dumps(data.get("busy_json", {})),
+            free_json=json.dumps(data.get("free_json", {})),
+        )
+
+        app.logger.info("=== Generating Study Plan ===")
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are Scholar AI Planner, an expert educational coach.",
+                },
+                {"role": "user", "content": filled_prompt},
+            ],
+            temperature=0.5,
+            max_tokens=1500,
+        )
+
+        if not response.choices:
+            raise RuntimeError("No choices returned from OpenAI")
+
+        raw_plan = response.choices[0].message.content.strip()
+        parsed_plan = _safe_json_loads(raw_plan) or {"raw": raw_plan}
+
+        # unwrap nested plan if LLM wrapped it
+        if isinstance(parsed_plan, dict) and "study_plan" in parsed_plan:
+            parsed_plan = parsed_plan["study_plan"]
+
+        # store a copy so user sees it on refresh
+        session["latest_study_plan"] = parsed_plan
+
+        return jsonify({"study_plan": parsed_plan})
+
+    except Exception as e:
+        app.logger.error(f"Error generating study plan: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------- Existing diagnostic & chat endpoints -----------------
+
+
+@app.route("/generate_test", methods=["POST"])
+def generate_test():
+    """
+    Generate a 10-question diagnostic test based on user input
+    and store it in session for later analysis.
+    """
+    data = request.get_json() or {}
+    subject = data.get("subject", "General")
+    grade_level = data.get("grade_level", "Unknown")
+    topic = data.get("topic", "")
+
+    system_prompt = (
+        "You are an expert curriculum developer. "
+        "Create a 10‑question diagnostic test mixing multiple‑choice (A–D) and short free‑response questions. "
+        "Format each question on a new line."
+    )
+
+    user_prompt = (
+        f"Subject: {subject}\n"
+        f"Grade Level: {grade_level}\n"
+        f"Topic: {topic}\n\n"
+        "Generate exactly 10 diagnostic questions."
+    )
+
+    try:
+        app.logger.info("=== Generating Diagnostic Test ===")
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.7,
+            max_tokens=1000,
+        )
+
+        diagnostic_test_text = (
+            response.choices[0].message.content.strip()
+            if response.choices
+            else "[No content returned by OpenAI]"
+        )
+        session["latest_diagnostic_test"] = diagnostic_test_text
+        return jsonify({"diagnostic_test": diagnostic_test_text})
+
+    except Exception as e:
+        app.logger.error(f"Error generating test: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/submit_test", methods=["POST"])
+def submit_test():
+    answers = request.get_json() or {}
+    session["latest_test_answers"] = answers
+
+    # ① immediately wipe the old summary so nothing stale can leak through
+    session["latest_diagnostic_analysis"] = "(pending)"   #  <<< NEW
+    session.modified = True                                #  <<< NEW
+
+    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+    try:
+        if diagnostic_test_text:
+            summary_prompt = (
+                "Below is a diagnostic test followed by the student's answers.\n"
+                "Write a concise 3‑4 sentence summary …"
+            )
+            resp = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": summary_prompt}],
+                temperature=0.5,
+                max_tokens=250,
+            )
+            summary_text = resp.choices[0].message.content.strip() if resp.choices else ""
+        else:
+            summary_text = "Diagnostic summary unavailable (test text missing)."
+    except Exception as e:
+        app.logger.error(f"Diagnostic summary generation failed: {e}")
+        summary_text = "Diagnostic summary unavailable due to an error."
+
+    # ② always — even on failure — store *something* new
+    session["latest_diagnostic_analysis"] = summary_text
+    app.logger.info("☑️  latest_diagnostic_analysis set to: %s",
+                    summary_text[:120])
+
+    return jsonify({"status": "ok"})
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    """
+    Primary chatbot endpoint. Sends diagnostic context + learning style
+    plus conversation to the LLM, then returns the reply.
+    """
+    data = request.json or {}
+    user_message = data.get("message", "")
+    subject = data.get("subject", "General Knowledge")
+
+    if "conversation" not in session:
+        session["conversation"] = []
+
+    if user_message:
+        session["conversation"].append({"role": "user", "content": user_message})
+
+    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+    test_answers = session.get("latest_test_answers", {})
+    primary_learning_style = session.get("primary_learning_style", "")
+    learning_style_scores = session.get("learning_style_scores", {})
+
+    # ---------------- build system message ----------------
+    text_file_path = "topic_prompts/initial_prompt.txt"
+    os.makedirs(os.path.dirname(text_file_path), exist_ok=True)
+    if not os.path.exists(text_file_path):
+        with open(text_file_path, "w") as file:
+            file.write(
+                "You are Scholar AI, an intelligent tutoring assistant. "
+                "Evaluate the student's diagnostic test answers below, identify correctness or mistakes, "
+                "and provide detailed feedback and next steps.\n"
+            )
+
+    with open(text_file_path, "r") as file:
+        initial_prompt = file.read()
+
+    system_content = (
+        initial_prompt + f"\n\nStudent has chosen the subject: {subject}\n\n"
+        "IMPORTANT: When a user first messages you or asks for help studying, "
+        "DO NOT ask generic questions about what subject they want to study. "
+        "Instead, immediately use the diagnostic test results and learning style information "
+        "provided below to offer personalized guidance. Assume they want help with the "
+        "material covered in their diagnostic test unless they specifically ask for something else.\n\n"
+    )
+
+    if diagnostic_test_text and test_answers:
+        system_content += "=== Diagnostic Test ===\n"
+        system_content += diagnostic_test_text + "\n\n"
+        system_content += "=== Student's Answers ===\n"
+        for key, val in test_answers.items():
+            system_content += f"{key}: {val}\n"
+        system_content += "\n"
+
+    if primary_learning_style:
+        system_content += "=== Student's Learning Style ===\n"
+        system_content += f"Primary Learning Style: {primary_learning_style}\n"
+        if learning_style_scores:
+            system_content += "Scores:\n"
+            for style, score in learning_style_scores.items():
+                system_content += f"- {style}: {score}\n"
+        system_content += "\n"
+
+        if primary_learning_style == "visual":
+            system_content += (
+                "- Use diagrams, charts, and images in explanations\n"
+                "- Suggest visual study aids like mind maps and color coding\n"
+                "- Describe concepts with visual metaphors and spatial relationships\n"
+            )
+        elif primary_learning_style == "auditory":
+            system_content += (
+                "- Explain concepts as if speaking them aloud\n"
+                "- Suggest verbal repetition and discussion-based learning\n"
+                "- Recommend audio recordings and verbal mnemonics\n"
+            )
+        elif primary_learning_style == "reading_writing":
+            system_content += (
+                "- Structure information in written format with lists and paragraphs\n"
+                "- Suggest note-taking and written summaries as study techniques\n"
+                "- Emphasize the importance of text-based learning resources\n"
+            )
+        elif primary_learning_style == "kinesthetic":
+            system_content += (
+                "- Relate concepts to physical experiences and real-world applications\n"
+                "- Suggest hands-on activities and practice-based learning\n"
+                "- Recommend movement and physical interaction while studying\n"
+            )
+
+    if diagnostic_test_text and test_answers:
+        system_content += (
+            "ALWAYS start by analyzing the diagnostic test results when the conversation begins "
+            "or when the user asks for help studying. Evaluate these answers for correctness, "
+            "identify which ones are wrong, explain the correct solutions, and offer "
+            "next steps or study tips tailored to their learning style.\n"
+        )
+
+    system_content += "If the user has other questions, do your best to help using the context.\n"
+
+    messages = [{"role": "system", "content": system_content}] + session["conversation"]
+
+    app.logger.info("=== Chat Endpoint Called ===")
+    app.logger.info(f"System message length: {len(system_content)} characters")
+
+    try:
+        if len(session["conversation"]) <= 1 and diagnostic_test_text and test_answers:
+            first_time_instruction = {
+                "role": "user",
+                "content": "Please analyze my diagnostic test results and provide feedback.",
+            }
+            messages.insert(1, first_time_instruction)
+
+        response = openai.chat.completions.create(
+            model="gpt-4o", messages=messages, temperature=0.7
+        )
+
+        if not response.choices:
+            app.logger.error("No choices returned from OpenAI in chat")
+            gpt_response = "[No content returned by OpenAI]"
+        else:
+            raw_content = response.choices[0].message.content or ""
+            gpt_response = raw_content.strip()
+
+        session["conversation"].append({"role": "assistant", "content": gpt_response})
+
+        app.logger.info("=== OpenAI Chat Response ===")
+        app.logger.info(gpt_response)
+
+        return jsonify({"response": gpt_response})
+
+    except Exception as e:
+        app.logger.error(f"An error occurred in /chat: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------- Utilities ----------------
+
+
+@app.route("/clear_session", methods=["GET"])
+def clear_session():
+    """
+    Simple endpoint to clear the session for a fresh start.
+    """
+    session.clear()
+    return jsonify({"status": "session cleared"})
+
+
+@app.route("/clear_conversation", methods=["POST"])
+def clear_conversation():
+    """
+    Clear only the conversation history but keep diagnostic and learning style data
+    """
+    session["conversation"] = []
+    return jsonify({"status": "conversation cleared, data preserved"})
+
+@app.route("/recommend_videos", methods=["POST"])
+def recommend_videos():
+    """
+    Return a JSON list of recommended videos.
+
+    The payload may include:
+        diagnostic_summary – str
+        learning_style     – str
+    If those are missing we fall back to whatever is in the session.
+    """
+    payload: Dict[str, Any] = request.get_json(silent=True) or {}
+    diagnostic_summary: str = (
+        payload.get("diagnostic_summary")
+        or session.get("latest_diagnostic_analysis", "")
+    )
+    learning_style: str = (
+        payload.get("learning_style")
+        or session.get("primary_learning_style", "")
+    )
+
+    if not diagnostic_summary:
+        # No context → front‑end shows placeholder
+        return jsonify({"videos": []})
+
+    # ───────────────── 1.  Build search queries with GPT ──────────────────
+    prompt_template = _read_prompt_template("topic_prompts/video_topic_prompt.txt")
+    user_prompt = prompt_template.format(
+        weak_areas=diagnostic_summary.strip(),
+        overall_subject="General curriculum",
+    )
+
+    try:
+        app.logger.info("=== Generating search queries for videos ===")
+        resp = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are Scholar AI Curator."},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.4,
+            max_tokens=200,
+        )
+        raw = resp.choices[0].message.content if resp.choices else "[]"
+        queries = _safe_json_loads(raw) or []
+        if not isinstance(queries, list):
+            queries = []
+        app.logger.info("‣ GPT search queries → %s", queries)
+    except Exception as exc:
+        app.logger.error("LLM failed, fallback to generic query: %s", exc)
+        queries = []
+
+    # ─────── 2.  Use YouTube API —  ────────
+    videos: List[Dict[str, str]] = []
+    seen: set[str] = set()
+
+    for q in queries:
+        for v in search_videos(q, max_results=5):
+            if v["video_id"] in seen:
+                continue
+            seen.add(v["video_id"])
+            videos.append(v)
+            if len(videos) >= 8:
+                break
+        if len(videos) >= 8:
+            break
+
+    # If nothing came back, *just* return an empty list – the UI will say so.
+    app.logger.info("Videos selected: %s", [v["title"] for v in videos])
+    return jsonify({"videos": videos})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
 </file>
 
 </files>

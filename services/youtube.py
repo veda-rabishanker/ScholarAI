@@ -7,14 +7,18 @@ Public function:
 """
 from __future__ import annotations
 
+from dotenv import load_dotenv      
+load_dotenv()      
+
 import logging
+import os
 from typing import List, Dict
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-_API_KEY = "AIzaSyArXgygP12FK7W9bN4JJagnEIeRTMZ0sxk"
+_API_KEY = os.getenv("YOUTUBE_API_KEY")
 _SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
 if not _API_KEY:
