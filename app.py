@@ -1,10 +1,17 @@
+from __future__ import annotations
+
+import json
 import logging
 import os
-import json
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, session
-from flask_session import Session
+from typing import Any, Dict, List
+
 import openai
+from flask import Flask, jsonify, render_template, request, session
+from flask_session import Session
+
+
+from services.youtube import search_videos
 
 app = Flask(__name__)
 
@@ -18,7 +25,7 @@ Session(app)
 app.logger.setLevel(logging.INFO)
 
 # put api key here 
-
+openai.api_key = "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"
 # --------------------- Helper Functions ---------------------
 
 
@@ -310,26 +317,19 @@ def generate_test():
 
 @app.route("/submit_test", methods=["POST"])
 def submit_test():
-    """
-    Store student's answers in session and create a concise strengths/weaknesses summary
-    so the planner wizard can display it.
-    """
     answers = request.get_json() or {}
     session["latest_test_answers"] = answers
 
-    app.logger.info("=== Diagnostic Test Answers Submitted ===")
+    # ① immediately wipe the old summary so nothing stale can leak through
+    session["latest_diagnostic_analysis"] = "(pending)"   #  <<< NEW
+    session.modified = True                                #  <<< NEW
 
     diagnostic_test_text = session.get("latest_diagnostic_test", "")
-
-    # ---------------- Generate 3‑4 sentence diagnostic summary ----------------
     try:
         if diagnostic_test_text:
             summary_prompt = (
                 "Below is a diagnostic test followed by the student's answers.\n"
-                "Write a concise 3‑4 sentence summary of overall strengths and weaknesses "
-                "without listing every question.\n\n"
-                f"=== Diagnostic Test ===\n{diagnostic_test_text}\n\n"
-                f"=== Student Answers ===\n{json.dumps(answers, indent=2)}"
+                "Write a concise 3‑4 sentence summary …"
             )
             resp = openai.chat.completions.create(
                 model="gpt-4o",
@@ -337,16 +337,17 @@ def submit_test():
                 temperature=0.5,
                 max_tokens=250,
             )
-            summary_text = (
-                resp.choices[0].message.content.strip() if resp.choices else ""
-            )
+            summary_text = resp.choices[0].message.content.strip() if resp.choices else ""
         else:
             summary_text = "Diagnostic summary unavailable (test text missing)."
     except Exception as e:
         app.logger.error(f"Diagnostic summary generation failed: {e}")
         summary_text = "Diagnostic summary unavailable due to an error."
 
+    # ② always — even on failure — store *something* new
     session["latest_diagnostic_analysis"] = summary_text
+    app.logger.info("☑️  latest_diagnostic_analysis set to: %s",
+                    summary_text[:120])
 
     return jsonify({"status": "ok"})
 
@@ -502,6 +503,76 @@ def clear_conversation():
     """
     session["conversation"] = []
     return jsonify({"status": "conversation cleared, data preserved"})
+
+@app.route("/recommend_videos", methods=["POST"])
+def recommend_videos():
+    """
+    Return a JSON list of recommended videos.
+
+    The payload may include:
+        diagnostic_summary – str
+        learning_style     – str
+    If those are missing we fall back to whatever is in the session.
+    """
+    payload: Dict[str, Any] = request.get_json(silent=True) or {}
+    diagnostic_summary: str = (
+        payload.get("diagnostic_summary")
+        or session.get("latest_diagnostic_analysis", "")
+    )
+    learning_style: str = (
+        payload.get("learning_style")
+        or session.get("primary_learning_style", "")
+    )
+
+    if not diagnostic_summary:
+        # No context → front‑end shows placeholder
+        return jsonify({"videos": []})
+
+    # ───────────────── 1.  Build search queries with GPT ──────────────────
+    prompt_template = _read_prompt_template("topic_prompts/video_topic_prompt.txt")
+    user_prompt = prompt_template.format(
+        weak_areas=diagnostic_summary.strip(),
+        overall_subject="General curriculum",
+    )
+
+    try:
+        app.logger.info("=== Generating search queries for videos ===")
+        resp = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are Scholar AI Curator."},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.4,
+            max_tokens=200,
+        )
+        raw = resp.choices[0].message.content if resp.choices else "[]"
+        queries = _safe_json_loads(raw) or []
+        if not isinstance(queries, list):
+            queries = []
+        app.logger.info("‣ GPT search queries → %s", queries)
+    except Exception as exc:
+        app.logger.error("LLM failed, fallback to generic query: %s", exc)
+        queries = []
+
+    # ─────── 2.  Use YouTube API —  ────────
+    videos: List[Dict[str, str]] = []
+    seen: set[str] = set()
+
+    for q in queries:
+        for v in search_videos(q, max_results=5):
+            if v["video_id"] in seen:
+                continue
+            seen.add(v["video_id"])
+            videos.append(v)
+            if len(videos) >= 8:
+                break
+        if len(videos) >= 8:
+            break
+
+    # If nothing came back, *just* return an empty list – the UI will say so.
+    app.logger.info("Videos selected: %s", [v["title"] for v in videos])
+    return jsonify({"videos": videos})
 
 
 if __name__ == "__main__":

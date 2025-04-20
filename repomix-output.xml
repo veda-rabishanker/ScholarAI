@@ -46,6 +46,8 @@ The content is organized as follows:
 static/
   chat.css
   chat.js
+  plan_calendar.js
+  plan_intake.js
   script.js
   styles.css
 templates/
@@ -58,6 +60,7 @@ templates/
 topic_prompts/
   diagnostic_test.txt
   initial_prompt.txt
+  study_plan_prompt.txt
 .gitignore
 c2cbot.code-workspace
 diagnostic_test.txt
@@ -103,6 +106,456 @@ document.addEventListener('DOMContentLoaded', () => {
       chatBox.scrollTop = chatBox.scrollHeight;
   }
 });
+</file>
+
+<file path="static/plan_calendar.js">
+/* ------------------------------------------------------------
+   plan_calendar.js
+   — render the study‑plan JSON into a calendar grid, show
+     details on click, and expose a “Regenerate Plan” button
+     that dispatches  plan:regenerate.
+------------------------------------------------------------ */
+
+(() => {
+    const root = document.getElementById("calendar-root");
+    if (!root) return console.error("plan_calendar.js ➜ #calendar-root not found");
+  
+    /* ───────────────────────── helpers ───────────────────────── */
+  
+    const dayNames   = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthNames = [
+      "January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    ];
+  
+    const safeParse = (txt) => { try { return JSON.parse(txt); } catch { return null; } };
+  
+    /* convert “5:30pm-7:30pm” → {start:"17:30", end:"19:30"} */
+    function splitTimeRange(range) {
+      if (!range) return null;
+      const [rawStart, rawEnd] = range.split("-").map(s => s.trim());
+      if (!rawStart || !rawEnd) return null;
+  
+      const to24h = (str) => {
+        const m = str.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (!m) return null;
+        let [, h, mm = "00", ap = ""] = m;
+        h  = parseInt(h, 10);
+        ap = ap.toLowerCase();
+        if (ap === "pm" && h !== 12) h += 12;
+        if (ap === "am" && h === 12) h  = 0;
+        return `${String(h).padStart(2,"0")}:${mm}`;
+      };
+  
+      const start = to24h(rawStart);
+      const end   = to24h(rawEnd);
+      return start && end ? { start, end } : null;
+    }
+  
+    /**
+     * Try‑hard extractor: returns an **array** of session objects
+     * from many possible shapes the backend / LLM might return.
+     */
+    function extractSessions(plan) {
+      if (!plan || typeof plan !== "object") return null;
+  
+      for (const k of ["sessions","study_plan","days","items"])
+        if (Array.isArray(plan[k])) return plan[k];
+  
+      /* markdown‑wrapped string under plan.raw */
+      if (typeof plan.raw === "string") {
+        let txt = plan.raw.trim();
+        if (txt.startsWith("```")) {
+          txt = txt.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+        }
+        const inner = safeParse(txt);
+        if (inner) return extractSessions(inner);         // recurse once
+      }
+      return null;
+    }
+  
+    /* ───────────────────── calendar renderer ─────────────────── */
+  
+    function renderCalendar(plan) {
+      const sessionsIn = extractSessions(plan);
+  
+      if (!sessionsIn) {
+        root.innerHTML = `
+          <div style="border:1px solid #e74c3c;padding:16px;border-radius:8px;background:#fdecea;color:#c0392b;">
+            <p><strong>Oops!</strong> I couldn’t understand the study‑plan format returned by the server.</p>
+            <button class="btn-secondary" id="regen-btn">Regenerate Plan</button>
+          </div>`;
+        root.querySelector("#regen-btn").onclick =
+          () => document.dispatchEvent(new Event("plan:regenerate"));
+        return;
+      }
+  
+      /* cache for page refreshes */
+      try { localStorage.setItem("latestStudyPlan", JSON.stringify(plan)); } catch { /* ignore quota */ }
+  
+      /* normalise every item to a common shape */
+      const sessions = sessionsIn.map(item => {
+        const t = splitTimeRange(item.time || item.timeslot || item.period || "");
+        return {
+          date:   item.date,
+          start:  t?.start || item.start || "?",
+          end:    t?.end   || item.end   || "?",
+          subject: item.subject || item.content || "",
+          label:  item.label || "",
+          instructions: item.instructions || item.focus || item.note || "",
+          type:   item.type || (item.label ? "test" : "study")
+        };
+      });
+  
+      /* group by ISO date */
+      const byDate = {};
+      sessions.forEach(s => {
+        if (s.date) (byDate[s.date] = byDate[s.date] || []).push(s);
+      });
+  
+      /* decide which month to show:
+         – earliest session’s month, else current month            */
+      let baseDate = new Date();
+      const allDates = Object.keys(byDate);
+      if (allDates.length) {
+        allDates.sort();                              // lexicographic → chronological for ISO
+        baseDate = new Date(allDates[0] + "T00:00:00");
+      }
+  
+      const month     = baseDate.getMonth();
+      const year      = baseDate.getFullYear();
+      const firstDay  = new Date(year, month, 1).getDay();
+      const daysInMon = new Date(year, month + 1, 0).getDate();
+  
+      /* header & grid scaffold */
+      root.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h2>${monthNames[month]} ${year}</h2>
+          <button class="btn-secondary" id="regen-btn">Regenerate Plan</button>
+        </div>
+        <div class="calendar-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;"></div>
+        <div id="detail-box" style="margin-top:20px;"></div>
+      `;
+  
+      const grid = root.querySelector(".calendar-grid");
+      dayNames.forEach(d => {
+        const hd = document.createElement("div");
+        hd.textContent = d;
+        hd.style = "font-weight:bold;text-align:center;";
+        grid.appendChild(hd);
+      });
+  
+      for (let i = 0; i < firstDay; i++) grid.appendChild(emptyCell());
+  
+      for (let d = 1; d <= daysInMon; d++) {
+        const iso  = new Date(year, month, d).toISOString().split("T")[0];
+        const cell = document.createElement("div");
+        cell.className = "day-cell";
+        cell.style = "border:1px solid #e0e0e0;min-height:90px;padding:4px;border-radius:6px;cursor:pointer;";
+  
+        const header = document.createElement("div");
+        header.textContent = d;
+        header.style = "font-weight:bold;margin-bottom:4px;";
+        cell.appendChild(header);
+  
+        (byDate[iso] || []).forEach(s => {
+          const block = document.createElement("div");
+          const kind  = s.type === "test" ? "test" : "session";
+          block.className = `${kind}-block`;
+          block.textContent =
+            kind === "test"
+              ? (s.label || "Test")
+              : `${s.subject || "Study"} • ${s.start}-${s.end}`;
+          block.style = `
+            font-size:11px;padding:2px 4px;margin-bottom:2px;border-radius:3px;color:#fff;
+            background:${kind === "test" ? "#2ecc71" : "#3498db"};
+          `;
+          cell.appendChild(block);
+        });
+  
+        cell.addEventListener("click", () => showDetails(iso, byDate[iso] || []));
+        grid.appendChild(cell);
+      }
+  
+      root.querySelector("#regen-btn").onclick =
+        () => document.dispatchEvent(new Event("plan:regenerate"));
+    }
+  
+    const emptyCell = () => {
+      const d = document.createElement("div");
+      d.style = "min-height:90px;";
+      return d;
+    };
+  
+    /* ──────────────────── accordion details ─────────────────── */
+  
+    function showDetails(dateISO, sessions) {
+      const box = document.getElementById("detail-box");
+      if (!sessions.length) {
+        box.innerHTML = `<p>No sessions on ${dateISO}</p>`;
+        return;
+      }
+      box.innerHTML = `
+        <h3>📅 ${dateISO}</h3>
+        <ul style="list-style:disc inside;margin-left:16px;">
+          ${sessions.map(s => `
+            <li style="margin:6px 0;">
+              <strong>${s.start}-${s.end}</strong> — ${s.subject || s.label || "Study"}<br>
+              <em>${s.instructions || "No details provided."}</em>
+            </li>`).join("")}
+        </ul>`;
+      box.scrollIntoView({ behavior:"smooth" });
+    }
+  
+    /* ─────────────────────── bootstrap ─────────────────────── */
+  
+    const cached = localStorage.getItem("latestStudyPlan");
+    if (cached) {
+      try { renderCalendar(JSON.parse(cached)); }
+      catch (e) { console.warn("cached plan unreadable", e); }
+    }
+  
+    document.addEventListener("plan:ready", e => renderCalendar(e.detail));
+  })();
+</file>
+
+<file path="static/plan_intake.js">
+/* 
+  wizard that gathers:
+      • study goals / subjects
+      • deadlines (label + date list)
+      • weekly availability  → busy & free blocks
+    Merges learner profile (window.LEARNER_PROFILE) and POSTs to
+    /generate_study_plan.  Emits  plan:ready  with the LLM‑crafted
+    plan JSON so plan_calendar.js can render it.
+
+    The wizard also listens for  plan:regenerate  (e.g. user clicks
+    “Regenerate” on the calendar) and resends the last payload.      */
+
+(() => {
+    /* ‑‑‑ quick DOM helpers ‑‑‑ */
+    const $  = (sel, ctx = document) => ctx.querySelector(sel);
+    const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+    const root = document.getElementById("intake-root");
+    if (!root) return console.error("plan_intake.js ➜ #intake-root not found");
+  
+    /* ‑‑‑ learner profile (diagnostic summary / learning style) ‑‑‑ */
+    window.LEARNER_PROFILE = {};            // make globally visible
+    let diagnosticSummary = "";             // cached string for wizard display
+  
+    /* ‑‑‑ wizard state ‑‑‑ */
+    const state = {
+      goals: "",
+      deadlines: [],                        // {label,date}
+      busy : {0: [],1: [],2: [],3: [],4: [],5: [],6: []},
+      free : {0: [],1: [],2: [],3: [],4: [],5: [],6: []}
+    };
+    let currentStep = 0;
+    let lastPayload = null;                 // for regenerate shortcut
+  
+    /* ‑‑‑ UI templates for each step ‑‑‑ */
+    const stepTemplates = [
+      /* STEP 1: goals */
+      () => `
+        <h2>1 · Study goals / subjects</h2>
+        ${diagnosticSummary
+          ? `<div class="diag-summary" style="background:#f0f4ff;border-left:4px solid #4677ff;padding:8px 12px;margin-bottom:12px;">
+               <strong>Diagnostic summary:</strong><br>${diagnosticSummary}
+             </div>`
+          : ""
+        }
+        <textarea id="goals-input" rows="5"
+          placeholder="e.g. Algebra II chapters 5‑7, score ≥ 85 % on 15 May test"
+          style="width:100%;"></textarea>
+      `,
+  
+      /* STEP 2: deadlines */
+      () => `
+        <h2>2 · Deadlines & tests</h2>
+        <p>Add important dates (exam, quiz, assignment, etc.).</p>
+        <div id="deadline-list"></div>
+        <button class="btn-secondary" id="add-deadline">+ Add deadline</button>
+      `,
+  
+      /* STEP 3: availability */
+      () => {
+        const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        return `
+          <h2>3 · Weekly availability</h2>
+          <p>Enter time ranges in 24‑hour format “HH:MM‑HH:MM”. Use commas for multiple blocks.</p>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr><th></th><th>Busy</th><th>Usually Free (optional)</th></tr>
+            </thead>
+            <tbody>
+              ${dayNames.map((d,i)=>`
+                <tr>
+                  <td style="padding-right:4px;">${d}</td>
+                  <td><input data-day="${i}" data-type="busy" style="width:100%;" placeholder="e.g. 09:00‑17:00"></td>
+                  <td><input data-day="${i}" data-type="free" style="width:100%;" placeholder="e.g. 18:00‑20:00"></td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        `;
+      },
+  
+      /* REVIEW + submit */
+      () => `
+        <h2>4 · Review & generate</h2>
+        <p>Click <strong>Generate Plan</strong> to create your personalised calendar.</p>
+        <ul>
+          <li><strong>Goals:</strong> ${state.goals || "<em>none</em>"}</li>
+          <li><strong>Deadlines:</strong> ${
+            state.deadlines.length
+              ? state.deadlines.map(d=>`${d.label} (${d.date})`).join(", ")
+              : "<em>none</em>"
+          }</li>
+        </ul>
+        <button class="btn-primary" id="generate-plan">Generate Plan</button>
+      `
+    ];
+  
+    /* ‑‑‑ render helper ‑‑‑ */
+    function renderStep() {
+      root.innerHTML = `
+        <div class="wizard-box">
+          ${stepTemplates[currentStep]()}
+          <div style="margin-top:20px;display:flex;justify-content:${currentStep ? "space-between" : "flex-end"}">
+            ${currentStep ? '<button class="btn-secondary" id="prev">Back</button>' : ""}
+            ${currentStep < stepTemplates.length-1 ? '<button class="btn-primary" id="next">Next</button>' : ""}
+          </div>
+        </div>
+      `;
+      attachHandlers();
+    }
+  
+    /* ‑‑‑ attach event handlers for current step ‑‑‑ */
+    function attachHandlers() {
+      $("#next")?.addEventListener("click", () => { if (saveStep()) { currentStep++; renderStep(); }});
+      $("#prev")?.addEventListener("click", () => { currentStep--; renderStep(); });
+  
+      /* step‑specific hooks */
+      if (currentStep === 0) {
+        $("#goals-input").value = state.goals;
+      }
+      if (currentStep === 1) {
+        const list = $("#deadline-list");
+        state.deadlines.forEach(addRow);
+        $("#add-deadline").addEventListener("click", () => addRow());
+        function addRow(d = { label:"", date:"" }) {
+          const row = document.createElement("div");
+          row.style = "display:flex;gap:6px;margin:6px 0";
+          row.innerHTML = `
+            <input placeholder="Label" style="flex:2" value="${d.label}">
+            <input type="date"        style="flex:1" value="${d.date}">
+            <button class="btn-secondary" title="remove">✕</button>`;
+          row.querySelector("button").onclick = () => row.remove();
+          list.appendChild(row);
+        }
+      }
+      if (currentStep === 2) {
+        $$("input[data-day]").forEach(inp => {
+          const day = inp.dataset.day, typ = inp.dataset.type;
+          inp.value = (state[typ][day] || []).join(", ");
+        });
+      }
+      /* final step */
+      $("#generate-plan")?.addEventListener("click", submitWizard);
+    }
+  
+    /* ‑‑‑ save inputs of current step into state ‑‑‑ */
+    function saveStep() {
+      if (currentStep === 0) {
+        state.goals = $("#goals-input").value.trim();
+        return true;
+      }
+      if (currentStep === 1) {
+        const rows = [...$("#deadline-list").children];
+        state.deadlines = rows.map(r => {
+          const [label, date] = r.querySelectorAll("input");
+          return { label: label.value.trim(), date: date.value };
+        }).filter(d => d.label && d.date);
+        return true;
+      }
+      if (currentStep === 2) {
+        $$("input[data-day]").forEach(inp => {
+          const { day, type } = inp.dataset;
+          const ranges = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+          state[type][day] = ranges;
+        });
+        return true;
+      }
+      return true;
+    }
+  
+    /* ‑‑‑ build payload & POST to backend ‑‑‑ */
+    function submitWizard() {
+      if (!saveStep()) return;
+  
+      const payload = {
+        diagnostic_summary : window.LEARNER_PROFILE?.diagnostic_summary || "",
+        learning_style     : window.LEARNER_PROFILE?.learning_style     || "",
+        study_goals        : state.goals,
+        deadlines_json     : state.deadlines,
+        busy_json          : state.busy,
+        free_json          : state.free
+      };
+      lastPayload = payload;                 // cache for regenerate
+  
+      root.innerHTML = "<p>⏳ Generating your plan…</p>";
+  
+      fetch("/generate_study_plan", {
+        method  : "POST",
+        headers : { "Content-Type": "application/json" },
+        body    : JSON.stringify(payload)
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(data => {
+        if (!data.study_plan) throw new Error("No study_plan in response");
+        document.dispatchEvent(new CustomEvent("plan:ready", { detail: data.study_plan }));
+        root.innerHTML = "";                 // hide wizard
+      })
+      .catch(err => {
+        console.error("Plan generation failed", err);
+        root.innerHTML = "<p style='color:red'>Failed to generate plan. Please try again.</p>";
+      });
+    }
+  
+    /* ‑‑‑ public “regenerate” listener ‑‑‑ */
+    document.addEventListener("plan:regenerate", () => {
+      if (lastPayload) {
+        fetch("/generate_study_plan", {
+          method  : "POST",
+          headers : { "Content-Type": "application/json" },
+          body    : JSON.stringify(lastPayload)
+        })
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(data => {
+          if (data.study_plan) {
+            document.dispatchEvent(new CustomEvent("plan:ready", { detail: data.study_plan }));
+          }
+        })
+        .catch(() => alert("Couldn’t regenerate plan – server error."));
+      } else {
+        currentStep = 0; renderStep();
+      }
+    });
+  
+    /* ‑‑‑ initialise: fetch learner profile then start wizard ‑‑‑ */
+    root.innerHTML = "<p>Loading learner profile…</p>";
+    fetch("/get_user_profile")
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(data => {
+        window.LEARNER_PROFILE  = data || {};
+        diagnosticSummary       = data.diagnostic_summary || "";
+      })
+      .catch(err => {
+        console.warn("Could not fetch learner profile:", err);
+      })
+      .finally(() => {
+        renderStep();
+      });
+  })();
 </file>
 
 <file path="static/script.js">
@@ -464,6 +917,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <file path="topic_prompts/diagnostic_test.txt">
 Your job is only to make 10 diagnostic questions based on the subject and grade level put in by the user.
+</file>
+
+<file path="topic_prompts/study_plan_prompt.txt">
+System
+You are Scholar AI Planner, an expert educational coach who produces concise, calendar‑friendly study sessions.
+Always output valid JSON following the “study_plan” schema.
+
+User
+Learner profile:
+• Diagnostic strengths / weaknesses: {diagnostic_summary}
+• Preferred learning style: {learning_style}
+
+Study objectives:
+• Goals / subjects: {study_goals}
+• Upcoming deadlines: {deadlines_json}
+
+Availability:
+• Busy blocks (ISO dates + HH:MM ranges): {busy_json}
+• Typical free windows: {free_json}
+
+Guidelines:
+• Break content into ≤ 2‑hour blocks.  
+• Match study methods to the learning style.  
+• Emphasise weak areas; light review on strengths.  
+• Final 24 h pre‑test = recap only.  
+
+Output **only JSON**, never prose.
 </file>
 
 <file path=".gitignore">
@@ -909,6 +1389,55 @@ form button:hover {
 .dropdown-content {
   padding: 5px 0;
 }
+
+/* ================================================================== */
+/* ===  New styles for Study Planner wizard & calendar (non‑breaking) */
+.wizard-box{
+  background:#ffffff;
+  padding:25px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  margin:30px 0;
+}
+.btn-primary{
+  background:#3498db;
+  color:#fff;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  transition:background 0.3s;
+}
+.btn-primary:hover{background:#2980b9;}
+.btn-secondary{
+  background:#95a5a6;
+  color:#fff;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  transition:background 0.3s;
+}
+.btn-secondary:hover{background:#7f8c8d;}
+.session-block{
+  background:#3498db;
+  color:#fff;
+  font-size:11px;
+  padding:2px 4px;
+  border-radius:3px;
+  margin-bottom:2px;
+  display:block;
+}
+.test-block{
+  background:#2ecc71;
+  color:#fff;
+  font-size:11px;
+  padding:2px 4px;
+  border-radius:3px;
+  margin-bottom:2px;
+  display:block;
+}
+/* ================================================================== */
 </file>
 
 <file path="templates/schedule.html">
@@ -917,663 +1446,93 @@ form button:hover {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plan Your Week | Scholar AI</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <title>Study Planner | Scholar AI</title>
+
+  <!-- global stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
+
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      line-height: 1.6;
-      background-color: #f5f7fa;
-      color: #2c3e50;
-      margin: 0;
-      padding: 0;
+    /* --- light, page‑specific tweaks only --- */
+    #learner-summary{
+      background:#f5f7fa;
+      border-left:4px solid #1b2a4e;
+      padding:15px 20px;
+      margin:30px 0;
+      border-radius:8px;
+      font-size:15px;
+      line-height:1.5;
     }
-    
-    .container {
-      width: 90%;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px 0;
-    }
-    
-    /* Header Styles */
-    header {
-      background: linear-gradient(135deg, #1b2a4e, #2c3e50);
-      color: #ffffff;
-      padding: 25px 0;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    nav ul {
-      list-style: none;
-      display: flex;
-      padding: 0;
-      margin: 15px 0 0 0;
-    }
-    
-    nav ul li {
-      margin: 0 15px;
-    }
-    
-    nav ul li a {
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.3s;
-      font-size: 16px;
-    }
-    
-    nav ul li a:hover {
-      color: #b0bec5;
-    }
-    
-    /* Main Content Styles */
-    main {
-      padding: 30px 0;
-    }
-    
-    h2 {
-      color: #1b2a4e;
-      margin-bottom: 20px;
-      font-size: 28px;
-      border-bottom: 2px solid #e0e0e0;
-      padding-bottom: 10px;
-    }
-    
-    /* Busy-Time Input Section */
-    #busy-time-section {
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-      margin-bottom: 30px;
-    }
-    
-    #week-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-      margin-top: 20px;
-    }
-    
-    .day-box {
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 15px;
-      background-color: white;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .day-box:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .day-box h3 {
-      margin: 0 0 15px 0;
-      text-align: center;
-      background-color: #3498db;
-      color: white;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-    
-    .busy-times {
-      margin-top: 10px;
-    }
-    
-    .busy-input {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      transition: border-color 0.3s;
-    }
-    
-    .busy-input:focus {
-      border-color: #3498db;
-      outline: none;
-    }
-    
-    .add-input-btn {
-      background-color: #2ecc71;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      cursor: pointer;
-      font-size: 18px;
-      line-height: 30px;
-      margin: 10px auto 0 auto;
-      display: block;
-      transition: background-color 0.3s;
-    }
-    
-    .add-input-btn:hover {
-      background-color: #27ae60;
-    }
-    
-    /* Test Date Section */
-    #test-date-section {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-      margin-bottom: 30px;
-    }
-    
-    #test-date-input {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 16px;
-      margin-right: 10px;
-      width: 200px;
-    }
-    
-    /* Action Buttons */
-    .action-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 25px;
-    }
-    
-    .btn {
-      padding: 12px 25px;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    
-    .btn-primary {
-      background-color: #3498db;
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      background-color: #2980b9;
-    }
-    
-    .btn-secondary {
-      background-color: #95a5a6;
-      color: white;
-    }
-    
-    .btn-secondary:hover {
-      background-color: #7f8c8d;
-    }
-    
-    /* Calendar Section */
-    #calendar-section {
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-      opacity: 0;
-      max-height: 0;
-      overflow: hidden;
-      transition: opacity 0.5s ease, max-height 0.5s ease, padding 0.5s ease;
-    }
-    
-    #calendar-section.show {
-      opacity: 1;
-      max-height: 2000px;
-      padding: 30px;
-    }
-    
-    .calendar {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 8px;
-      margin-top: 20px;
-    }
-    
-    .calendar .header {
-      font-weight: bold;
-      background-color: #f8f9fa;
-      padding: 10px;
-      text-align: center;
-      border-radius: 4px;
-    }
-    
-    .calendar .day {
-      border: 1px solid #e0e0e0;
-      padding: 10px;
-      min-height: 100px;
-      text-align: right;
-      position: relative;
-      border-radius: 4px;
-      background-color: white;
-      transition: all 0.3s;
-    }
-    
-    .calendar .day:hover {
-      background-color: #f8f9fa;
-    }
-    
-    .calendar .day.empty {
-      background-color: #f8f9fa;
-      border: 1px dashed #ddd;
-    }
-    
-    .day-number {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    
-    .busy-time-event {
-      background-color: #e74c3c;
-      color: white;
-      padding: 3px 6px;
-      margin-top: 5px;
-      font-size: 12px;
-      border-radius: 3px;
-      text-align: left;
-    }
-    
-    .test-day-marker {
-      background-color: #2ecc71;
-      color: white;
-      padding: 3px 6px;
-      margin-top: 5px;
-      font-size: 12px;
-      border-radius: 3px;
-      text-align: left;
-    }
-    
-    .study-suggestion {
-      background-color: #3498db;
-      color: white;
-      padding: 3px 6px;
-      margin-top: 5px;
-      font-size: 12px;
-      border-radius: 3px;
-      text-align: left;
-    }
-    
-    /* Responsive Styles */
-    @media (max-width: 768px) {
-      #week-container {
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      }
-      
-      .calendar {
-        grid-template-columns: repeat(7, minmax(40px, 1fr));
-      }
-      
-      .calendar .day {
-        min-height: 80px;
-        font-size: 14px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      #week-container {
-        grid-template-columns: 1fr;
-      }
-      
-      .action-buttons {
-        flex-direction: column;
-      }
-      
-      .btn {
-        width: 100%;
-      }
-    }
+    #calendar-root{margin-top:40px;}
   </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1>Scholar AI</h1>
-      <nav>
-        <ul>
-          <li><a href="/">Home</a></li>
-          <li class="dropdown">
-            <a href="javascript:void(0)" class="dropbtn">Tests</a>
-            <div class="dropdown-content">
-              <a href="/diagnostic">Diagnostic Test</a>
-              <a href="/learning_style">Learning Style</a>
-            </div>
-          </li>
-          <li><a href="/chatbot">Chatbot</a></li>
-          <li><a href="/schedule">Schedule</a></li>
-          <li><a href="/results">Results</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
+<header>
+  <div class="container">
+    <h1>Scholar AI</h1>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li class="dropdown">
+          <a href="javascript:void(0)" class="dropbtn">Tests</a>
+          <div class="dropdown-content">
+            <a href="/diagnostic">Diagnostic Test</a>
+            <a href="/learning_style">Learning Style</a>
+          </div>
+        </li>
+        <li><a href="/chatbot">Chatbot</a></li>
+        <li><a href="/schedule">Schedule</a></li>
+        <li><a href="/results">Results</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
 
-  <main class="container">
-    <!-- Busy-Time Input Section -->
-    <section id="busy-time-section">
-      <h2>When You Can't Study</h2>
-      <p>Enter the times you're unavailable each day. Click the + button to add more time slots.</p>
-      <div id="week-container">
-        <!-- Day boxes for each day of the week -->
-        <div class="day-box" data-day="0">
-          <h3>Sunday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 1:00 PM - 2:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="1">
-          <h3>Monday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 9:00 AM - 5:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="2">
-          <h3>Tuesday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 2:00 PM - 4:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="3">
-          <h3>Wednesday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 12:00 PM - 1:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="4">
-          <h3>Thursday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 3:00 PM - 5:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="5">
-          <h3>Friday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 6:00 PM - 8:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-        <div class="day-box" data-day="6">
-          <h3>Saturday</h3>
-          <div class="busy-times">
-            <input type="text" class="busy-input" placeholder="e.g., 10:00 AM - 12:00 PM">
-          </div>
-          <button class="add-input-btn" title="Add more busy times">+</button>
-        </div>
-      </div>
-    </section>
+<main class="container">
+  <!-- learner context (diagnostic + learning style) -->
+  <section id="learner-summary">
+    <!-- Filled dynamically -->
+    <em>Loading your profile…</em>
+  </section>
 
-    <!-- Test Date Section -->
-    <section id="test-date-section">
-      <h2>Upcoming Test</h2>
-      <p>Enter your test date to get personalized study recommendations:</p>
-      <div style="display: flex; align-items: center; margin-top: 15px;">
-        <input type="date" id="test-date-input">
-        <button id="save-test-date-btn" class="btn btn-secondary">Save Date</button>
-      </div>
-    </section>
+  <!-- intake wizard mount -->
+  <section id="intake-root"></section>
 
-    <!-- Action Buttons -->
-    <div class="action-buttons">
-      <button id="plan-week-btn" class="btn btn-primary">Generate Study Plan</button>
-      <button id="clear-data-btn" class="btn btn-secondary">Clear All Data</button>
-    </div>
+  <!-- calendar mount -->
+  <section id="calendar-root"></section>
+</main>
 
-    <!-- Calendar Section -->
-    <section id="calendar-section">
-      <h2 id="calendar-month-heading">Your Study Plan</h2>
-      <div id="calendar" class="calendar">
-        <!-- Calendar headers -->
-        <div class="header">Sunday</div>
-        <div class="header">Monday</div>
-        <div class="header">Tuesday</div>
-        <div class="header">Wednesday</div>
-        <div class="header">Thursday</div>
-        <div class="header">Friday</div>
-        <div class="header">Saturday</div>
-        <!-- Day cells will be generated here -->
-      </div>
-    </section>
-  </main>
+<footer>
+  <div class="container">
+    <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+  </div>
+</footer>
 
-  <footer>
-    <div class="container">
-      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
-    </div>
-  </footer>
+<!-- JS bundles -->
+<script type="module" src="{{ url_for('static', filename='plan_intake.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='plan_calendar.js') }}"></script>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      // Current date information
-      const today = new Date();
-      const currentMonth = today.getMonth();
-      const currentYear = today.getFullYear();
-      const monthNames = [
-        "January", "February", "March", "April", "May", "June", 
-        "July", "August", "September", "October", "November", "December"
-      ];
-      
-      // DOM Elements
-      const calendarHeading = document.getElementById("calendar-month-heading");
-      const calendarSection = document.getElementById("calendar-section");
-      const testDateInput = document.getElementById("test-date-input");
-      
-      // Set default test date to today + 7 days
-      const defaultTestDate = new Date();
-      defaultTestDate.setDate(defaultTestDate.getDate() + 7);
-      testDateInput.valueAsDate = defaultTestDate;
-      
-      // Initialize the page
-      calendarHeading.innerText = `${monthNames[currentMonth]} ${currentYear} Study Plan`;
-      
-      // --- Helper Functions ---
-      
-      // Add more busy time inputs when + button is clicked
-      document.querySelectorAll(".add-input-btn").forEach(button => {
-        button.addEventListener("click", function() {
-          const dayBox = this.parentElement;
-          const busyTimesContainer = dayBox.querySelector(".busy-times");
-          const newInput = document.createElement("input");
-          newInput.type = "text";
-          newInput.classList.add("busy-input");
-          newInput.placeholder = "e.g., 1:00 PM - 2:00 PM";
-          busyTimesContainer.appendChild(newInput);
-        });
-      });
-      
-      // Generate calendar grid for the current month
-      function generateCalendar() {
-        const calendarDiv = document.getElementById("calendar");
-        // Clear existing day cells (keep headers)
-        while (calendarDiv.children.length > 7) {
-          calendarDiv.removeChild(calendarDiv.lastChild);
-        }
-        
-        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        
-        // Add empty cells for days before the 1st of the month
-        for (let i = 0; i < firstDay; i++) {
-          const emptyCell = document.createElement("div");
-          emptyCell.classList.add("day", "empty");
-          calendarDiv.appendChild(emptyCell);
-        }
-        
-        // Create cells for each day of the month
-        for (let day = 1; day <= daysInMonth; day++) {
-          const dayCell = document.createElement("div");
-          dayCell.classList.add("day");
-          const date = new Date(currentYear, currentMonth, day);
-          const dayOfWeek = date.getDay();
-          
-          dayCell.innerHTML = `<div class="day-number">${day}</div>`;
-          dayCell.setAttribute("data-date", date.toISOString().split('T')[0]);
-          dayCell.setAttribute("data-weekday", dayOfWeek);
-          
-          calendarDiv.appendChild(dayCell);
-        }
+<!-- tiny bootstrap script to expose learner profile & summary -->
+<script>
+/* On load fetch diagnostic summary & learning style once */
+fetch("/get_user_profile")
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(data => {
+      window.LEARNER_PROFILE = data;            // accessible to modules
+      const box=document.getElementById("learner-summary");
+      if(!data || Object.keys(data).length===0){
+        box.innerHTML="<strong>No profile data yet.</strong> Complete a diagnostic test and learning‑style assessment for best results.";
+        return;
       }
-      
-      // Update calendar with busy times and study suggestions
-      function updateCalendar(weekData, testDate) {
-        const dayCells = document.querySelectorAll("#calendar .day:not(.empty)");
-        
-        dayCells.forEach(cell => {
-          const dateStr = cell.getAttribute("data-date");
-          const weekday = cell.getAttribute("data-weekday");
-          const busyTimes = weekData[weekday] || [];
-          
-          // Clear previous markers
-          cell.querySelectorAll('.busy-time-event, .study-suggestion, .test-day-marker').forEach(el => el.remove());
-          
-          // Add test day marker if this is the test date
-          if (dateStr === testDate) {
-            const testMarker = document.createElement("div");
-            testMarker.classList.add("test-day-marker");
-            testMarker.textContent = "Test Day";
-            cell.appendChild(testMarker);
-          }
-          
-          // Add busy times
-          busyTimes.forEach(time => {
-            const busyDiv = document.createElement("div");
-            busyDiv.classList.add("busy-time-event");
-            busyDiv.textContent = time;
-            cell.appendChild(busyDiv);
-          });
-          
-          // Add study suggestions (excluding test day and busy times)
-          if (dateStr !== testDate && busyTimes.length === 0) {
-            const studyDiv = document.createElement("div");
-            studyDiv.classList.add("study-suggestion");
-            studyDiv.textContent = "Suggested study time";
-            cell.appendChild(studyDiv);
-          }
-        });
-      }
-      
-      // Load saved data from localStorage
-      function loadStoredData() {
-        const storedWeekData = localStorage.getItem("busyWeekData");
-        const storedTestDate = localStorage.getItem("testDate");
-        
-        if (storedWeekData) {
-          const weekData = JSON.parse(storedWeekData);
-          populateBusyInputs(weekData);
-          return weekData;
-        }
-        return null;
-      }
-      
-      // Populate busy time inputs from data
-      function populateBusyInputs(weekData) {
-        document.querySelectorAll(".day-box").forEach(dayBox => {
-          const day = dayBox.getAttribute("data-day");
-          const busyTimes = weekData[day] || [];
-          const busyContainer = dayBox.querySelector(".busy-times");
-          
-          busyContainer.innerHTML = "";
-          if (busyTimes.length > 0) {
-            busyTimes.forEach(time => {
-              const input = document.createElement("input");
-              input.type = "text";
-              input.classList.add("busy-input");
-              input.value = time;
-              busyContainer.appendChild(input);
-            });
-          } else {
-            // Add one empty input if no data for this day
-            const input = document.createElement("input");
-            input.type = "text";
-            input.classList.add("busy-input");
-            busyContainer.appendChild(input);
-          }
-        });
-      }
-      
-      // Save test date
-      function saveTestDate() {
-        const testDate = testDateInput.value;
-        if (testDate) {
-          localStorage.setItem("testDate", testDate);
-          alert("Test date saved successfully!");
-        }
-      }
-      
-      // --- Event Handlers ---
-      
-      // Save test date button
-      document.getElementById("save-test-date-btn").addEventListener("click", saveTestDate);
-      
-      // Generate study plan button
-      document.getElementById("plan-week-btn").addEventListener("click", function() {
-        // Gather busy times
-        const weekData = {};
-        document.querySelectorAll(".day-box").forEach(dayBox => {
-          const day = dayBox.getAttribute("data-day");
-          const inputs = dayBox.querySelectorAll(".busy-input");
-          weekData[day] = Array.from(inputs)
-            .map(input => input.value.trim())
-            .filter(time => time !== "");
-        });
-        
-        // Save data
-        localStorage.setItem("busyWeekData", JSON.stringify(weekData));
-        saveTestDate();
-        
-        // Generate and update calendar
-        generateCalendar();
-        updateCalendar(weekData, testDateInput.value);
-        
-        // Show calendar section
-        calendarSection.style.display = "block";
-        setTimeout(() => {
-          calendarSection.classList.add("show");
-        }, 10);
-      });
-      
-      // Clear all data button
-      document.getElementById("clear-data-btn").addEventListener("click", function() {
-        if (confirm("Are you sure you want to clear all your data?")) {
-          localStorage.removeItem("busyWeekData");
-          localStorage.removeItem("testDate");
-          document.querySelectorAll(".busy-input").forEach(input => {
-            input.value = "";
-          });
-          testDateInput.valueAsDate = defaultTestDate;
-          calendarSection.classList.remove("show");
-          setTimeout(() => {
-            calendarSection.style.display = "none";
-          }, 500);
-        }
-      });
-      
-      // Initialize the page with saved data
-      const storedWeekData = loadStoredData();
-      const storedTestDate = localStorage.getItem("testDate");
-      
-      if (storedTestDate) {
-        testDateInput.value = storedTestDate;
-      }
-      
-      if (storedWeekData) {
-        generateCalendar();
-        updateCalendar(storedWeekData, storedTestDate || testDateInput.value);
-        calendarSection.style.display = "block";
-        setTimeout(() => {
-          calendarSection.classList.add("show");
-        }, 10);
-      }
-    });
-  </script>
+      const styleName={
+        visual:"Visual",auditory:"Auditory",
+        reading_writing:"Reading/Writing",kinesthetic:"Kinesthetic"
+      }[data.learning_style]||data.learning_style;
+      box.innerHTML=
+        `<strong>Learning Style:</strong> ${styleName}<br>`+
+        `<strong>Diagnostic Summary:</strong> ${data.diagnostic_summary}`;
+  })
+  .catch(()=>{document.getElementById("learner-summary").textContent="Unable to load profile data.";});
+</script>
 </body>
 </html>
 </file>

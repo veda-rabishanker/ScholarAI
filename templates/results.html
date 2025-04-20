@@ -3,307 +3,115 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scholar AI - Results</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-  <style>
-    /* Results Page Styles */
-    .results-section {
-      background: #f9f9f9;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 30px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+  <title>Scholar AI – Results</title>
 
-    .results-section h3 {
-      color: #2c3e50;
-      margin-top: 0;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-    }
-
-    #progress-chart {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 20px;
-      min-height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .placeholder {
-      color: #999;
-      font-style: italic;
-    }
-
-    .btn {
-      display: inline-block;
-      background: #3498db;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 4px;
-      text-decoration: none;
-      margin-top: 10px;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      background: #2980b9;
-    }
-
-    /* Video Section Styles */
-    .video-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-    
-    .video-card {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      transition: transform 0.3s;
-    }
-    
-    .video-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .video-thumbnail {
-      position: relative;
-      padding-bottom: 56.25%; /* 16:9 aspect ratio */
-      cursor: pointer;
-    }
-    
-    .video-thumbnail img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .video-info {
-      padding: 15px;
-    }
-    
-    .video-info h4 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-    }
-    
-    .video-info p {
-      margin: 5px 0;
-      font-size: 14px;
-      color: #666;
-    }
-    
-    .embedded-video {
-      width: 100%;
-      aspect-ratio: 16/9;
-      margin-bottom: 20px;
-      border: none;
-    }
-
-    #video-search-form {
-      margin: 20px 0;
-    }
-
-    #no-videos-message {
-      color: #666;
-      font-style: italic;
-    }
-  </style>
+  <!-- global stylesheet & helpers -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
   <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+
+  <style>
+    /* ────────── page‑specific tweaks ────────── */
+    .results-section{background:#f9f9f9;border-radius:8px;padding:20px;margin-bottom:30px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .results-section h3{color:#2c3e50;margin-top:0;border-bottom:1px solid #eee;padding-bottom:10px;}
+    #progress-chart{background:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;min-height:200px;display:flex;align-items:center;justify-content:center;}
+    .placeholder{color:#999;font-style:italic;}
+
+    /* video gallery – reused by video_recs.js */
+    .video-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:20px;}
+    .video-card{border:1px solid #ddd;border-radius:8px;overflow:hidden;transition:transform .3s;}
+    .video-card:hover{transform:translateY(-5px);box-shadow:0 5px 15px rgba(0,0,0,.1);}
+    .video-thumbnail{position:relative;padding-bottom:56.25%;cursor:pointer;}
+    .video-thumbnail img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+    .video-info{padding:15px;}
+    .video-info h4{margin:0 0 10px;font-size:16px;}
+    .video-info p{margin:5px 0;font-size:14px;color:#666;}
+    .embedded-video{width:100%;aspect-ratio:16/9;margin-bottom:20px;border:none;}
+    .btn{display:inline-block;background:#3498db;color:#fff;padding:10px 15px;border-radius:4px;text-decoration:none;margin-top:10px;border:none;cursor:pointer;}
+    .btn:hover{background:#2980b9;}
+  </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1>Scholar AI</h1>
-      <nav>
-        <ul>
-          <li><a href="/">Home</a></li>
-          <li class="dropdown">
-            <a href="javascript:void(0)" class="dropbtn">Tests</a>
-            <div class="dropdown-content">
-              <a href="/diagnostic">Diagnostic Test</a>
-              <a href="/learning_style">Learning Style</a>
-            </div>
-          </li>
-          <li><a href="/chatbot">Chatbot</a></li>
-          <li><a href="/schedule">Schedule</a></li>
-          <li><a href="/results">Results</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
-
-  <section id="results" class="results">
-    <div class="container">
-      <h2>Your Results</h2>
-      
-      <!-- Diagnostic Test Results Section -->
-      <div id="diagnostic-results" class="results-section">
-        <h3>Diagnostic Test Performance</h3>
-        <div id="test-results-content">
-          {% if diagnostic_results %}
-            <p>{{ diagnostic_results }}</p>
-          {% else %}
-            <p>No diagnostic test results available. Complete a diagnostic test to see your results.</p>
-            <a href="/diagnostic" class="btn">Take Diagnostic Test</a>
-          {% endif %}
-        </div>
-      </div>
-      
-      <!-- Learning Style Results Section -->
-      <div id="learning-style-results" class="results-section">
-        <h3>Learning Style Assessment</h3>
-        <div id="learning-style-content">
-          {% if learning_style_results %}
-            <p>{{ learning_style_results }}</p>
-          {% else %}
-            <p>No learning style assessment completed. Take the assessment to discover your preferred learning style.</p>
-            <a href="/learning_style" class="btn">Take Learning Style Assessment</a>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Educational Videos Section -->
-      <div id="educational-videos" class="results-section">
-        <h3>Recommended Educational Videos</h3>
-        
-        <!-- Video search form (hidden when videos are shown) -->
-        <div id="video-search-form" {% if not test_answers.topic %}style="display: none;"{% endif %}>
-          <input type="hidden" id="video-topic" value="{{ test_answers.topic if test_answers else '' }}">
-          <button id="find-videos-btn" class="btn">Find Related Videos</button>
-        </div>
-        
-        <!-- Video results container -->
-        <div id="video-results-container" class="video-container">
-          <!-- Videos will be loaded here -->
-          <p id="no-videos-message">No videos loaded yet. {% if test_answers.topic %}Click "Find Related Videos" to see recommendations.{% else %}Complete a diagnostic test to get video recommendations.{% endif %}</p>
-        </div>
-      </div>
-      
-      <!-- Progress Tracking Section -->
-      <div id="progress-tracking" class="results-section">
-        <h3>Progress Over Time</h3>
-        <div id="progress-content">
-          <p>Your progress tracking will appear here after multiple assessments.</p>
-          <div id="progress-chart">
-            <!-- This could be replaced with a chart from Chart.js or similar -->
-            <p class="placeholder">Progress chart will be displayed here</p>
+<header>
+  <div class="container">
+    <h1>Scholar AI</h1>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li class="dropdown">
+          <a href="javascript:void(0)" class="dropbtn">Tests</a>
+          <div class="dropdown-content">
+            <a href="/diagnostic">Diagnostic Test</a>
+            <a href="/learning_style">Learning Style</a>
           </div>
+        </li>
+        <li><a href="/chatbot">Chatbot</a></li>
+        <li><a href="/schedule">Schedule</a></li>
+        <li><a href="/results">Results</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section id="results" class="results">
+  <div class="container">
+    <h2>Your Results</h2>
+
+    <!-- Diagnostic Performance -->
+    <!-- DEBUG‑DIAG: {{ diagnostic_analysis|default('EMPTY')|truncate(60) }} -->
+    <div id="diagnostic-results" class="results-section">
+      <h3>Diagnostic Test Performance</h3>
+      <div id="test-results-content">
+        {% if diagnostic_analysis %}
+          <p>{{ diagnostic_analysis }}</p>
+        {% else %}
+          <p>No diagnostic test results available. Complete a diagnostic test to see your results.</p>
+          <a href="/diagnostic" class="btn">Take Diagnostic Test</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Learning‑style -->
+    <div id="learning-style-results" class="results-section">
+      <h3>Learning Style Assessment</h3>
+      <div id="learning-style-content">
+        {% if learning_interpretation %}
+          <p>{{ learning_interpretation }}</p>
+        {% else %}
+          <p>No learning style assessment completed. Take the assessment to discover your preferred learning style.</p>
+          <a href="/learning_style" class="btn">Take Learning Style Assessment</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Recommended videos -->
+    <div id="educational-videos" class="results-section">
+      <h3>Recommended Educational Videos</h3>
+      <div id="video-recs-root"
+           data-diagnostic-summary="{{ diagnostic_analysis|default('', true) }}"
+           data-learning-style="{{ primary_style|default('', true) }}"></div>
+    </div>
+
+    <!-- Progress tracking -->
+    <div id="progress-tracking" class="results-section">
+      <h3>Progress Over Time</h3>
+      <div id="progress-content">
+        <p>Your progress tracking will appear here after multiple assessments.</p>
+        <div id="progress-chart">
+          <p class="placeholder">Progress chart will be displayed here</p>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <footer>
-    <div class="container">
-      <p>&copy; 2025 Scholar AI. All rights reserved.</p>
-    </div>
-  </footer>
+<footer>
+  <div class="container">
+    <p>&copy; 2025 Scholar AI. All rights reserved.</p>
+  </div>
+</footer>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const videoTopic = document.getElementById('video-topic')?.value;
-      const findVideosBtn = document.getElementById('find-videos-btn');
-      
-      // Handle video search
-      findVideosBtn?.addEventListener('click', function() {
-        if (!videoTopic) return;
-        
-        this.disabled = true;
-        this.textContent = 'Loading...';
-        document.getElementById('no-videos-message').textContent = 'Searching for videos...';
-        
-        fetch('/search_videos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: videoTopic + ' educational' })
-        })
-        .then(response => {
-          if (!response.ok) throw new Error('Network response was not ok');
-          return response.json();
-        })
-        .then(data => {
-          displayVideos(data.videos || []);
-          findVideosBtn.textContent = 'Refresh Videos';
-          findVideosBtn.disabled = false;
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          document.getElementById('no-videos-message').textContent = 'Failed to load videos. Please try again later.';
-          findVideosBtn.textContent = 'Try Again';
-          findVideosBtn.disabled = false;
-        });
-      });
-      
-      function displayVideos(videos) {
-        const container = document.getElementById('video-results-container');
-        
-        if (!videos || videos.length === 0) {
-          container.innerHTML = '<p id="no-videos-message">No videos found for this topic.</p>';
-          return;
-        }
-        
-        container.innerHTML = '';
-        
-        videos.forEach(video => {
-          const videoCard = document.createElement('div');
-          videoCard.className = 'video-card';
-          
-          videoCard.innerHTML = `
-            <div class="video-thumbnail" onclick="embedVideo('${video.video_id}', this)">
-              <img src="${video.thumbnail}" alt="${video.title}">
-            </div>
-            <div class="video-info">
-              <h4>${video.title}</h4>
-              <p>Channel: ${video.channel}</p>
-            </div>
-          `;
-          
-          container.appendChild(videoCard);
-        });
-      }
-      
-      // Make embedVideo function available globally
-      window.embedVideo = function(videoId, clickedElement) {
-        const container = document.getElementById('video-results-container');
-        
-        // Create back button
-        const backButton = document.createElement('button');
-        backButton.className = 'btn';
-        backButton.textContent = 'Back to Videos';
-        backButton.onclick = function() {
-          // Trigger the video search again to show all videos
-          document.getElementById('find-videos-btn').click();
-        };
-        
-        // Create video iframe
-        const videoIframe = document.createElement('iframe');
-        videoIframe.className = 'embedded-video';
-        videoIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-        videoIframe.setAttribute('frameborder', '0');
-        videoIframe.setAttribute('allowfullscreen', '');
-        videoIframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
-        
-        // Clear container and add new elements
-        container.innerHTML = '';
-        container.appendChild(backButton);
-        container.appendChild(videoIframe);
-        
-        // Scroll to video section
-        document.getElementById('educational-videos').scrollIntoView({ behavior: 'smooth' });
-      };
-    });
-  </script>
+<!-- modular bundle powering the video recommendations (cache‑busted) -->
+<script type="module" defer
+        src="{{ url_for('static', filename='video_recs.js') }}?v=5"></script>
 </body>
 </html>
