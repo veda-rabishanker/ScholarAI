@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from dotenv import load_dotenv 
-load_dotenv()      
+from dotenv import load_dotenv
+load_dotenv()
 
-import json
 import logging
 import os
-from datetime import datetime
-from typing import Any, Dict, List
+import json
 import re
+import datetime as dt
 from collections import Counter
+from typing import Any, Dict, List
 
 import openai
 from flask import Flask, jsonify, render_template, request, session
 from flask_session import Session
 
-
 from services.youtube import search_videos
+
 
 app = Flask(__name__)
 
@@ -26,8 +26,9 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# Force the logger to show INFO level messages
-app.logger.setLevel(logging.INFO)
+
+app.logger.setLevel(logging.DEBUG)
+
 
 # put api key here 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -78,6 +79,35 @@ def _safe_json_loads(text: str):
         return None
 
 
+def _parse_queries_from_text(text: str) -> list[str]:
+    """
+    Strip a plain‑text GPT reply down to distinct search phrases.
+
+    • Removes code‑fences, brackets, quotes, bullets, numbers, commas.
+    • Keeps first five unique, non‑blank lines (case‑insensitive).
+    """
+    text = re.sub(r"```.*?```", "", text, flags=re.S)            # drop ```…```
+    text = re.sub(r"[\[\]\"]", "", text)                         # drop [] and "
+    raw  = [re.sub(r"^[\s•\-\d\)\.]*", "", ln).strip(" ,")
+            for ln in text.splitlines()]
+    seen, queries = set(), []
+    for ln in raw:
+        low = ln.lower()
+        if ln and low not in seen:
+            seen.add(low)
+            queries.append(ln)
+        if len(queries) == 5:
+            break
+    return queries
+
+
+def _strip_code_fence(text: str) -> str:
+    return re.sub(r"^\s*```[\w-]*\s*|\s*```\s*$", "", text, flags=re.S)
+
+def _normalize_quotes(text: str) -> str:
+    for bad, good in {"“":'"', "”":'"', "‘":'"', "’":'"'}.items():
+        text = text.replace(bad, good)
+    return text
 # --------------------- Routes ---------------------
 
 
@@ -234,74 +264,147 @@ def schedule():
 
 # ---------------- Study Planner (AI calendar) endpoints -----------------
 
-
 @app.route("/generate_study_plan", methods=["POST"])
 def generate_study_plan():
     """
-    Accepts JSON payload from the intake wizard and returns a
-    JSON study plan produced by the LLM.
+    Wizard payload → GPT‑4o → strict JSON study plan.
+    Returns { "study_plan": [ …session objects… ] }.
     """
-    data = request.get_json() or {}
-    try:
-        # read & format prompt template
-        template_path = "topic_prompts/study_plan_prompt.txt"
-        template = _read_prompt_template(template_path)
-        filled_prompt = template.format(
-            diagnostic_summary=data.get("diagnostic_summary", ""),
-            learning_style=data.get("learning_style", ""),
-            study_goals=data.get("study_goals", ""),
-            deadlines_json=json.dumps(data.get("deadlines_json", [])),
-            busy_json=json.dumps(data.get("busy_json", {})),
-            free_json=json.dumps(data.get("free_json", {})),
-        )
+    data = request.get_json(silent=True) or {}
 
-        app.logger.info("=== Generating Study Plan ===")
-        response = openai.chat.completions.create(
+    # ---------- 1) Context pulled from session + payload -------------
+    subject      = session.get("latest_diagnostic_subject", "General Studies")
+    topic        = session.get("latest_diagnostic_topic",   subject)
+    grade_level  = session.get("latest_diagnostic_grade",   "Unknown")
+    diagnostic_test_text = session.get("latest_diagnostic_test", "")
+    test_answers = session.get("latest_test_answers", {})
+    diagnostic_summary = data.get("diagnostic_summary") \
+        or session.get("latest_diagnostic_analysis", "")
+    learning_style = data.get("learning_style") \
+        or session.get("primary_learning_style", "")
+    today = dt.date.today().isoformat()
+
+    # ---------- 2) Build prompt  ------------------------------------
+    # 2‑a.  Load your narrative template
+    template_path = "topic_prompts/study_plan_prompt.txt"
+    template_body = _read_prompt_template(template_path)
+    prompt_body = template_body.format(
+        subject=subject,
+        topic=topic,
+        grade_level=grade_level,
+        diagnostic_test=(diagnostic_test_text[:800] or "[not available]"),
+        student_answers=(chr(10).join(f"{k}: {v}" for k, v in test_answers.items())[:800]
+                         or "[not available]"),
+        diagnostic_summary=diagnostic_summary,
+        learning_style=learning_style,
+        study_goals=data.get("study_goals", ""),
+        deadlines_json=json.dumps(data.get("deadlines_json", [])),
+        busy_json=json.dumps(data.get("busy_json", {})),
+        free_json=json.dumps(data.get("free_json", {})),
+        json_rules="" 
+    )
+
+    # 2‑b.  Append the strict schema block
+    schema_block = f"""
+STRUCTURE REQUIREMENTS
+Return **ONLY** valid JSON — no markdown fences, no commentary.
+Top‑level key "plan" → array of session objects.
+
+Each session object must have exactly:
+  "date"        : "YYYY‑MM‑DD"  (≥ {today})
+  "start"       : "HH:MM"       (24‑h)
+  "end"         : "HH:MM"       (24‑h)
+  "focus_topic" : string  (≤80 chars)
+  "approach"    : string  (1 concise sentence)
+  "tasks"       : array [2‑4] of strings (each ≤120 chars)
+
+Mini‑example:
+{{
+  "plan":[{{
+    "date":"{today}",
+    "start":"17:00",
+    "end":"18:00",
+    "focus_topic":"Solving linear equations",
+    "approach":"Walk through examples aloud with colour‑coded steps.",
+    "tasks":[
+      "Watch youtu.be/abc123 (5 min)",
+      "Solve 4 practice problems",
+      "Summarise the steps in your own words"
+    ]
+  }}]
+}}
+
+Formatting rules:
+• Use straight quotes " " (no curly quotes).  
+• If you wrap, wrap exactly as shown above.
+""".strip()
+
+    prompt = prompt_body + "\n\n" + schema_block
+
+    # ---------- 3) Call GPT‑4o --------------------------------------
+    try:
+        app.logger.info("=== Generating Study Plan (JSON) ===")
+        resp = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are Scholar AI Planner, an expert educational coach.",
-                },
-                {"role": "user", "content": filled_prompt},
+                {"role": "system", "content": "You are Scholar AI Planner. Output JSON only."},
+                {"role": "user",   "content": prompt},
             ],
-            temperature=0.5,
-            max_tokens=1500,
+            temperature=0.35,
+            max_tokens=1600,
         )
+        if not resp.choices:
+            raise RuntimeError("OpenAI returned no choices")
 
-        if not response.choices:
-            raise RuntimeError("No choices returned from OpenAI")
+        raw = resp.choices[0].message.content.strip()
+        app.logger.debug("LLM raw (first 400 chars): %s", raw[:400])
 
-        raw_plan = response.choices[0].message.content.strip()
-        parsed_plan = _safe_json_loads(raw_plan) or {"raw": raw_plan}
+        # ---------- 4) Clean → Parse → Validate ----------------------
+        clean  = _normalize_quotes(_strip_code_fence(raw))
+        parsed = _safe_json_loads(clean)
+        if parsed is None:
+            raise ValueError("Cannot parse JSON (see debug log)")
 
-        # unwrap nested plan if LLM wrapped it
-        if isinstance(parsed_plan, dict) and "study_plan" in parsed_plan:
-            parsed_plan = parsed_plan["study_plan"]
+        raw_list = parsed["plan"] if isinstance(parsed, dict) and "plan" in parsed else parsed
+        if not isinstance(raw_list, list):
+            raise ValueError('Top‑level JSON must be list or {"plan":[…]}')
 
-        # store a copy so user sees it on refresh
-        session["latest_study_plan"] = parsed_plan
+        req = {"date","start","end","focus_topic","approach","tasks"}
+        sessions = [s for s in raw_list
+                    if isinstance(s, dict) and set(s.keys()) == req
+                    and isinstance(s["tasks"], list)]
 
-        return jsonify({"study_plan": parsed_plan})
+        if not sessions:
+            raise ValueError("No fully‑conforming session objects found")
+
+        app.logger.info("✔ Parsed %d sessions", len(sessions))
+
+        # ---------- 5) Cache & Return -------------------------------
+        session["latest_study_plan"] = sessions
+        return jsonify({"study_plan": sessions})
 
     except Exception as e:
-        app.logger.error(f"Error generating study plan: {e}")
+        app.logger.exception("Study‑plan generation failed")
         return jsonify({"error": str(e)}), 500
 
 
-# ---------------- Existing diagnostic & chat endpoints -----------------
+# ---------------- diagnostic & chat endpoints -----------------
 
 
 @app.route("/generate_test", methods=["POST"])
 def generate_test():
     """
-    Generate a 10-question diagnostic test based on user input
-    and store it in session for later analysis.
+    Create a 10‑question diagnostic test and remember its meta‑data.
     """
-    data = request.get_json() or {}
-    subject = data.get("subject", "General")
-    grade_level = data.get("grade_level", "Unknown")
-    topic = data.get("topic", "")
+    data         = request.get_json() or {}
+    subject      = data.get("subject", "General")
+    grade_level  = data.get("grade_level", "Unknown")
+    topic        = data.get("topic", subject)   # fallback to subject if blank
+
+    # 💾  keep meta‑data so /submit_test can use it
+    session["latest_diagnostic_subject"] = subject
+    session["latest_diagnostic_grade"]   = grade_level
+    session["latest_diagnostic_topic"]   = topic
 
     system_prompt = (
         "You are an expert curriculum developer. "
@@ -330,8 +433,7 @@ def generate_test():
 
         diagnostic_test_text = (
             response.choices[0].message.content.strip()
-            if response.choices
-            else "[No content returned by OpenAI]"
+            if response.choices else "[No content returned by OpenAI]"
         )
         session["latest_diagnostic_test"] = diagnostic_test_text
         return jsonify({"diagnostic_test": diagnostic_test_text})
@@ -345,7 +447,7 @@ def generate_test():
 def submit_test():
     """
     Save the student’s answers, ask GPT‑4 o for a concise strengths/weaknesses
-    summary (no per‑question list), then cache that summary in the session.
+    summary that STARTS with the topic + grade level.
     """
     answers: Dict[str, str] = request.get_json() or {}
     session["latest_test_answers"] = answers
@@ -356,15 +458,24 @@ def submit_test():
 
     diagnostic_test_text: str = session.get("latest_diagnostic_test", "")
 
-    # ─────────────────── build prompt ───────────────────
+    # --------------- fetch meta‑data we saved earlier -----------------
+    topic       = session.get("latest_diagnostic_topic",   "General")
+    grade_level = session.get("latest_diagnostic_grade",   "Unknown")
+    subject     = session.get("latest_diagnostic_subject", "General")
+
+    # ---------------- build prompt -----------------------------------
     summary_prompt = (
         "You are an expert tutor analysing a diagnostic test.\n\n"
-        "Below is the test followed by the student’s answers. "
-        "Using that information, write **only** a concise 3‑4 "
-        "sentence summary describing:\n"
+        f"Test topic      : {topic}\n"
+        f"Grade level     : {grade_level}\n"
+        f"Subject category: {subject}\n\n"
+        "Below is the test followed by the student’s answers.  "
+        "Write **only** a concise 3‑4 sentence summary describing:\n"
         " • the student’s strengths\n"
         " • their weaknesses / misconceptions\n"
         " • what topics they should focus on next\n\n"
+        "FIRST line **must** be exactly:\n"
+        f"{topic} diagnostic (grade {grade_level}) summary:\n\n"
         "Do **NOT** reproduce the questions, answers, or any ✔️/✖️ list.\n\n"
         "=== Diagnostic Test ===\n"
         f"{diagnostic_test_text}\n\n"
@@ -384,11 +495,15 @@ def submit_test():
         summary_text = (
             resp.choices[0].message.content.strip()
             if resp.choices else
+            f"{topic} diagnostic (grade {grade_level}) summary:\n"
             "Diagnostic summary unavailable – no content returned by OpenAI."
         )
     except Exception as exc:
         app.logger.error("Diagnostic summary generation failed: %s", exc)
-        summary_text = "Diagnostic summary unavailable due to an error."
+        summary_text = (
+            f"{topic} diagnostic (grade {grade_level}) summary:\n"
+            "Diagnostic summary unavailable due to an error."
+        )
 
     # store whatever we got so the Results page can display it
     session["latest_diagnostic_analysis"] = summary_text
@@ -556,10 +671,6 @@ def clear_conversation():
 def recommend_videos():
     """
     Build YouTube recommendations from the diagnostic summary.
-
-    1. Ask GPT‑4o for 3‑5 focussed search queries.
-    2. If GPT comes back empty → fall back to simple keyword extraction.
-    3. Call the YouTube Data API for each query and return a list of videos.
     """
     payload = request.get_json(silent=True) or {}
 
@@ -571,6 +682,10 @@ def recommend_videos():
         payload.get("learning_style")
         or session.get("primary_learning_style", "")
     )
+    grade_level = (
+        payload.get("grade_level")
+        or session.get("latest_diagnostic_grade", "Unknown")
+    )
 
     # No context yet?  Front‑end will show a placeholder.
     if not diagnostic_summary:
@@ -581,23 +696,39 @@ def recommend_videos():
     user_prompt     = prompt_template.format(
         weak_areas      = diagnostic_summary.strip(),
         overall_subject = "General curriculum",
+        learning_style  = learning_style or "unspecified",
+        grade_level     = grade_level,
     )
+
+    system_msg = (
+        "You are Scholar AI Curator for an educational web app.\n"
+        "Context: the user just completed a diagnostic test; your job is to "
+        "propose YouTube search queries that will surface *instructional videos* "
+        "to help them with their weakest areas.\n\n"
+        "Guidelines for your output:\n"
+        "• Produce **exactly 3‑5 lines**.\n"
+        "• EACH line must end with the phrase “for grade {grade}”.\n"
+        "  Example:   multiplying fractions visually **for grade {grade}**\n"
+        "• Reflect the diagnostic summary and (if supplied) the learner’s primary "
+        "learning style (e.g. use words like “visual explanation” for visual learners).\n"
+        "• DO NOT include JSON, quotes, bullets, numbers, brackets, code‑fences, "
+        "intro text, or outro comments—just the bare lines.\n"
+        
+    ).format(grade=grade_level)
 
     try:
         app.logger.info("=== Generating search queries for videos ===")
         resp = openai.chat.completions.create(
-            model       = "gpt-4o",
-            messages    = [
-                {"role": "system", "content": "You are Scholar AI Curator."},
+            model    = "gpt-4o",
+            messages = [
+                {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_prompt},
             ],
             temperature = 0.4,
-            max_tokens  = 200,
+            max_tokens  = 120,
         )
-        raw     = resp.choices[0].message.content if resp.choices else "[]"
-        queries = _safe_json_loads(raw) or []
-        if not isinstance(queries, list):
-            queries = []
+        raw     = resp.choices[0].message.content if resp.choices else ""
+        queries = _parse_queries_from_text(raw)    # <-- unchanged helper you already have
         app.logger.info("‣ GPT search queries → %s", queries)
     except Exception as exc:
         app.logger.error("LLM failed: %s", exc)
@@ -605,7 +736,8 @@ def recommend_videos():
 
     # ---------- 2)  Fallback if GPT came back empty --------------------
     if not queries:
-        queries = _keyword_fallback(diagnostic_summary)
+        queries = [f"{q} for grade {grade_level}"
+                   for q in _keyword_fallback(diagnostic_summary)]
         app.logger.info("⚠️  Using keyword‑fallback queries → %s", queries)
 
     # ---------- 3)  YouTube search ------------------------------------
@@ -616,13 +748,14 @@ def recommend_videos():
                 continue
             seen.add(vid["video_id"])
             videos.append(vid)
-            if len(videos) >= 8:           # cap the gallery at 8 videos
+            if len(videos) >= 3:
                 break
-        if len(videos) >= 8:
+        if len(videos) >= 3:
             break
 
     app.logger.info("Videos selected: %s", [v['title'] for v in videos])
     return jsonify({"videos": videos})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
